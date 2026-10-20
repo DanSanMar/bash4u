@@ -1,7 +1,7 @@
 #!/bin/bash
 # bash4u.sh — curso interactivo de Bash scripting de cero a experto.
 #
-# Fase 1: motor (pantallas, estado, etapas, validación, XP) + niveles piloto 2 y 4.
+# Fase 1: motor (pantallas, estado, etapas, validación, XP) + niveles piloto 0, 1, 2 y 4.
 # Todo el curso vive en este archivo; ver README.md para el uso.
 #
 # Convenciones internas:
@@ -12,7 +12,7 @@
 
 set -uo pipefail
 
-VERSION="0.1.1"
+VERSION="0.2.0"
 DIR_DATOS="${XDG_DATA_HOME:-$HOME/.local/share}/bash4u"
 ARCH_ESTADO="$DIR_DATOS/estado"
 DIR_PRACTICAS="${BASH4U_PRACTICAS:-$HOME/bash4u-practicas}"
@@ -56,8 +56,13 @@ R_TIMEOUT=5
 R_CASOS=()
 R_ARCHIVO=""
 R_CHEQUEO=""
+R_LOGRO=""
 DETALLE_FALLO=""
 STTY_ORIG=""
+
+# Posición del reto dentro del nivel (para mostrar «2 de 3»).
+RETO_INDICE=0
+RETO_CUANTOS=0
 
 # =============================================================== utilidades ===
 
@@ -242,8 +247,10 @@ pantalla() {
 
 pausa() {
     [[ $AUTOTEST -eq 1 ]] && return 0
+    # Sin teclado (por ejemplo, entrada por tubería) no tiene sentido pedir Enter.
+    [[ -t 0 ]] || return 0
     printf '%s' "${C_GRIS}(Enter para continuar)${C_RESET} "
-    IFS= read -r _ || return 1
+    IFS= read -r -e _ || return 1
     return 0
 }
 
@@ -281,8 +288,9 @@ paginar() {
         i=$fin
         if (( i < total )); then
             [[ $AUTOTEST -eq 1 ]] && continue
+            [[ -t 0 ]] || continue
             printf '%s' "${C_GRIS}-- Más -- (Enter)${C_RESET} "
-            IFS= read -r _ || return 1
+            IFS= read -r -e _ || return 1
         fi
     done
     return 0
@@ -389,6 +397,7 @@ definir_reto() {
     R_TIMEOUT=${7:-5}
     R_ARCHIVO=""
     R_CHEQUEO=""
+    R_LOGRO=""
     shift 7
     R_CASOS=("$@")
 }
@@ -397,11 +406,14 @@ bucle_reto() {
     local xp=${1:-10}
     local intentos=0 max=3
     local -a lineas=()
-    local linea codigo limpia
+    local linea codigo limpia titulo guardado cuerpo
+
+    titulo="Reto ${R_ID}"
+    (( RETO_CUANTOS > 0 )) && titulo+=" · ${RETO_INDICE} de ${RETO_CUANTOS}"
 
     while (( intentos < max )); do
         lineas=()
-        pantalla "Reto ${R_ID}" "${R_ENUNCIADO}
+        pantalla "$titulo" "${R_ENUNCIADO}
 
 Escribe tu solución, una línea por vez.
 Cuando termines, escribe una línea con solo:   # fin
@@ -446,7 +458,8 @@ Si te atascas: :pista   ·   Ver tu código: :ver   ·   Empezar de nuevo: :borr
         done
 
         if (( ${#lineas[@]} == 0 )); then
-            printf '%s\n' "No escribiste nada."
+            printf '%s\n' "No escribiste nada. Vuelve a intentarlo."
+            pausa || true
             continue
         fi
 
@@ -456,31 +469,44 @@ Si te atascas: :pista   ·   Ver tu código: :ver   ·   Empezar de nuevo: :borr
                 codigo=${codigo#$'\n'}
             done
         fi
+
         if ejecutar_codigo "$codigo"; then
-            printf '%s\n' "${C_OK}✔ Correcto. +${xp} XP${C_RESET}"
+            guardado=""
             if [[ -n $R_ARCHIVO ]]; then
                 if mkdir -p "$DIR_PRACTICAS" 2>/dev/null \
                     && printf '%s\n' "$codigo" > "$DIR_PRACTICAS/$R_ARCHIVO"; then
-                    printf '%s\n' "Guardado en ${DIR_PRACTICAS}/${R_ARCHIVO}"
+                    guardado="Guardado en ${DIR_PRACTICAS}/${R_ARCHIVO}"
                 fi
             fi
             EST_RETOS=$(agregar_lista "$EST_RETOS" "$R_ID")
             EST_PENDIENTES=$(quitar_lista "$EST_PENDIENTES" "$R_ID")
             sumar_xp "$xp"
+
+            cuerpo="✔ Correcto. +${xp} XP"
+            [[ -n $R_LOGRO ]] && cuerpo+=$'\n'$'\n'"${R_LOGRO}"
+            [[ -n $guardado ]] && cuerpo+=$'\n'$'\n'"${guardado}"
+            pantalla "Reto ${R_ID} superado" "$cuerpo" "Enter para continuar"
+            pausa || true
             return 0
         fi
 
         intentos=$((intentos + 1))
-        printf '%s\n' "${C_ERR}✘ Todavía no.${C_RESET} ${DETALLE_FALLO}"
         if (( intentos < max )); then
-            printf '%s\n' "Intento ${intentos} de ${max}. Usa :pista si te atascas."
+            pantalla "Reto ${R_ID} · todavía no" "${DETALLE_FALLO}" \
+                "Intento ${intentos} de ${max} · Enter para reintentar"
+            pausa || true
+        else
+            pantalla "Reto ${R_ID} · sin intentos" "${DETALLE_FALLO}
+
+Solución de referencia:
+
+${R_SOLUCION}" "Enter para continuar"
+            pausa || true
         fi
     done
 
     EST_PENDIENTES=$(agregar_lista "$EST_PENDIENTES" "$R_ID")
     guardar_estado
-    printf '%s\n' "Se agotaron los intentos. Solución de referencia:"
-    printf '%s\n' "$R_SOLUCION"
     return 1
 }
 
@@ -569,7 +595,10 @@ ejecutar_retos_de() {
 
     local -n retos="$nombre"
     local r
+    RETO_CUANTOS=${#retos[@]}
+    RETO_INDICE=0
     for r in "${retos[@]}"; do
+        RETO_INDICE=$((RETO_INDICE + 1))
         "$r"
         bucle_reto || todos=0
     done
@@ -637,23 +666,42 @@ demo_00() {
     (
         cd "$tmp" || exit 0
 
-        printf '%s\n' "→ pwd muestra el directorio actual:"
+        printf '%s\n' "→ Trabajamos en una carpeta temporal para no tocar tus archivos."
+        printf '%s\n' "→ pwd muestra dónde estás:"
         pwd
 
-        printf '%s\n' "→ creamos hola.sh con una redirección"
-        printf '%s\n' '#!/bin/bash' 'echo "Hola, bash"' > hola.sh
+        printf '%s\n' "→ ls lista lo que hay (al principio está vacía):"
+        ls -A
 
-        printf '%s\n' "→ contenido del archivo:"
+        printf '%s\n' "→ echo imprime texto:"
+        echo "Hola, bash"
+
+        printf '%s\n' "→ las comillas dobles conservan los espacios:"
+        echo "Hola,   mundo"
+
+        printf '%s\n' "→ sin comillas, bash parte el texto por espacios y los colapsa:"
+        echo Hola,   mundo
+
+        printf '%s\n' "→ > envía la salida a un archivo; no se ve en pantalla:"
+        printf '%s\n' "Hola, archivo" > saludo.txt
+        printf '%s\n' "→ cat muestra el contenido del archivo:"
+        cat saludo.txt
+
+        printf '%s\n' "→ creamos un script con shebang y un echo:"
+        printf '%s\n' '#!/bin/bash' 'echo "Hola desde un script"' > hola.sh
         cat hola.sh
 
-        printf '%s\n' "→ se ejecuta con bash:"
+        printf '%s\n' "→ bash lo ejecuta:"
         bash hola.sh
 
-        printf '%s\n' "→ bash -n comprueba la sintaxis sin ejecutar:"
-        bash -n hola.sh && printf '%s\n' "sintaxis ok"
+        printf '%s\n' "→ bash -n revisa la sintaxis sin ejecutar:"
+        bash -n hola.sh && printf '%s\n' "sin errores de sintaxis"
 
+        printf '%s\n' "→ chmod +x da permiso de ejecución:"
         chmod +x hola.sh
-        printf '%s\n' "→ con permiso de ejecución también funciona así:"
+        ls -l hola.sh
+
+        printf '%s\n' "→ ./hola.sh lo ejecuta directamente:"
         ./hola.sh
     )
     rm -rf "$tmp"
@@ -662,66 +710,216 @@ demo_00() {
 reto_00_1() {
     definir_reto \
         "0.1" \
-        "Escribe el contenido de tu primer script.
+        "Vas a escribir el contenido de tu primer script.
 
 El curso lo guardará como hola.sh y lo ejecutará con bash.
+Un archivo .sh es, por convención, un script de shell: texto con
+órdenes de bash.
+
 Debe imprimir exactamente:
 Hola, bash" \
-        "Un script empieza con la línea #!/bin/bash y usa echo para imprimir.
+        "Escribe dos líneas:
+  #!/bin/bash
+  echo \"Hola, bash\"
 No tienes que crear el archivo: escribe solo su contenido." \
         '#!/bin/bash
 echo "Hola, bash"' \
-        'echo "Adiós"' \
+        '#!/bin/bash
+echo "Adiós"' \
         '' 5 \
         "|Hola, bash|0"
     R_ARCHIVO="hola.sh"
+    R_LOGRO="Has escrito un script con shebang y lo has ejecutado con bash."
 }
 
 reto_00_2() {
     definir_reto \
         "0.2" \
-        "Crea un archivo llamado saludo.txt cuyo contenido sea exactamente
-esta línea:
+        "Escribe un script llamado comillas.sh que imprima exactamente
+esta línea, con TRES espacios entre «Hola,» y «mundo»:
+
+Hola,   mundo
+     ^^^ tres espacios, no uno
+
+Usa comillas dobles alrededor del texto. El curso guardará el archivo
+y lo ejecutará con bash." \
+        "echo \"Hola,   mundo\"
+Las comillas dobles conservan los espacios. Sin comillas, bash separa
+el texto por espacios y los convierte en uno solo." \
+        '#!/bin/bash
+echo "Hola,   mundo"' \
+        '#!/bin/bash
+echo Hola,   mundo' \
+        '' 5 \
+        "|Hola,   mundo|0"
+    R_ARCHIVO="comillas.sh"
+    R_LOGRO="Has usado comillas para conservar los espacios."
+}
+
+reto_00_3() {
+    definir_reto \
+        "0.3" \
+        "Crea un archivo llamado saludo.txt en el directorio actual.
+Su contenido debe ser exactamente esta línea:
 
 Hola, bash
 
-Usa una redirección. No imprimas nada por pantalla: el texto debe
-quedar dentro del archivo." \
+Usa una redirección > para enviar el texto al archivo.
+No imprimas nada por pantalla: el texto debe quedar dentro." \
         "printf '%s\\n' \"Hola, bash\" > saludo.txt
-El símbolo > envía la salida a un archivo en vez de a la pantalla." \
+También vale: echo \"Hola, bash\" > saludo.txt
+El símbolo > escribe la salida en un archivo en vez de en la pantalla." \
         'printf "%s\n" "Hola, bash" > saludo.txt' \
         'printf "%s\n" "Hola, bash" > saludo.txt.bak' \
         '' 5 \
         "||0"
     R_CHEQUEO='[[ -f saludo.txt ]] && [[ "$(cat saludo.txt)" == "Hola, bash" ]]'
+    R_LOGRO="Has usado > para crear saludo.txt con el texto dentro."
 }
 
-RETOS_00=(reto_00_1 reto_00_2)
+RETOS_00=(reto_00_1 reto_00_2 reto_00_3)
 
 leccion_00() {
-    pantalla "Nivel 0 · ${TITULOS[0]}" "" "Escribe tu solución al final de la teoría."
-    paginar "La terminal es una conversación con el sistema: cada línea que escribes
-es un comando, y bash es el programa que los interpreta.
+    pantalla "Nivel 0 · ${TITULOS[0]}" "Vamos despacio, desde el principio.
+No hace falta saber nada de programación.
+Al final escribirás y ejecutarás tus propios archivos." "Enter para empezar"
+    pausa || return 1
 
-• pwd                 muestra el directorio actual.
-• ls                  lista el contenido.
-• cd carpeta          cambia de directorio; cd .. sube uno.
-• /home/arch/...      ruta absoluta; hola.sh es relativa al directorio actual.
-• echo texto          imprime; printf es más predecible con formatos.
-• cmd > archivo       redirige la salida y sobrescribe el archivo.
-• cmd >> archivo      añade al final sin borrar lo anterior.
+    pantalla "Nivel 0 · Parte 1" "La terminal y las carpetas" ""
+    paginar "$(cat <<'TEXTO'
+La terminal es una ventana donde escribes órdenes.
+Bash es el programa que lee esas órdenes y las ejecuta.
 
-Un script es un archivo de texto con comandos. Su primera línea,
-#!/bin/bash, indica qué intérprete debe usarlo.
+Al abrir la terminal verás un prompt parecido a:
+  arch@maquina:~$
+El prompt no se escribe: solo indica que bash espera una orden.
 
-Se ejecuta con:
-  bash script.sh
-y, si tiene permiso de ejecución (chmod +x), también con:
-  ./script.sh
+Una orden tiene un comando y, a veces, argumentos:
+  ls -l /home/arch
+  │  │  └── argumento: qué quieres listar
+  │  └───── argumento: cómo lo quieres listar
+  └──────── comando: qué programa se ejecuta
 
-Antes de ejecutar conviene comprobar la sintaxis con bash -n script.sh." \
-        || return 1
+El directorio actual es la carpeta donde estás.
+  pwd          imprime el directorio actual (print working directory)
+  ls           lista el contenido
+  ls -l        lista con detalles: permisos, tamaño, fecha
+  ls -A        incluye archivos ocultos (los que empiezan por .)
+  cd carpeta   entra en una carpeta
+  cd ..        sube a la carpeta padre
+  cd           vuelve a tu carpeta personal
+  cd -         vuelve a la carpeta anterior
 
+Hay dos formas de escribir una ruta:
+  /home/arch/notas.txt   absoluta: empieza por / y no depende de dónde estés
+  notas.txt              relativa: se busca desde el directorio actual
+  ./notas.txt            relativa explícita: «aquí mismo»
+  ../notas.txt           relativa: en la carpeta padre
+
+Truco: si un nombre lleva espacios, ponlo entre comillas.
+  cd "Mis documentos"
+TEXTO
+)" || return 1
+    pausa || return 1
+
+    pantalla "Nivel 0 · Parte 2" "Archivos, extensiones y comillas" ""
+    paginar "$(cat <<'TEXTO'
+Un archivo guarda texto o datos. Su nombre suele terminar en una
+extensión: la parte que va después del último punto.
+
+  hola.sh     .sh   convención para scripts de shell
+  saludo.txt  .txt  convención para texto plano
+  datos.csv   .csv  convención para datos separados por comas
+  foto.png    .png  convención para imágenes
+
+La extensión NO cambia el contenido ni lo que bash puede hacer.
+Bash no mira la extensión: `bash archivo.txt` también ejecuta su texto.
+La extensión es una convención para que las personas y los editores
+sepáis qué esperar. Por eso:
+  - un script se llama .sh
+  - una nota o un dato de texto se llama .txt
+
+Crear texto en pantalla:
+  echo "Hola"             imprime Hola y un salto de línea
+  printf '%s\n' "Hola"    imprime con formato; más predecible
+
+Comillas y espacios:
+  echo "Hola,   mundo"    conserva los tres espacios
+  echo 'Hola,   mundo'    también los conserva
+  echo Hola,   mundo      bash separa por espacios y los colapsa
+
+  "..."  comillas dobles: agrupan el texto y permiten expandir $variables
+         (las variables llegan en el nivel 1; por ahora basta con los espacios)
+  '...'  comillas simples: agrupan el texto y todo es literal
+  \      barra invertida: escapa el carácter siguiente
+         "Él dijo \"hola\""   imprime: Él dijo "hola"
+         "Cuesta \$5"         imprime: Cuesta $5
+
+Regla práctica: si el texto lleva espacios, ponlo entre comillas.
+TEXTO
+)" || return 1
+    pausa || return 1
+
+    pantalla "Nivel 0 · Parte 3" "Redirigir la salida a un archivo" ""
+    paginar "$(cat <<'TEXTO'
+La salida normal de un comando se llama stdout y va a la pantalla.
+Puedes redirigirla a un archivo con >:
+
+  echo "Hola" > saludo.txt
+
+Eso crea saludo.txt (o lo sobrescribe si ya existía) y no imprime
+nada en pantalla. Para añadir sin borrar lo anterior:
+
+  echo "Adiós" >> saludo.txt
+
+Para ver lo que quedó dentro:
+
+  cat saludo.txt
+
+También puedes crear carpetas:
+
+  mkdir practica
+  mkdir -p ruta/que/no/existe
+
+> escribe; >> añade. El archivo se crea en el directorio actual
+salvo que indiques una ruta:
+
+  echo "Hola" > practica/saludo.txt
+TEXTO
+)" || return 1
+    pausa || return 1
+
+    pantalla "Nivel 0 · Parte 4" "Tu primer script" ""
+    paginar "$(cat <<'TEXTO'
+Un script es un archivo de texto con órdenes de bash, una por línea.
+
+  #!/bin/bash
+  echo "Hola, bash"
+
+La primera línea es el shebang: empieza por #! e indica qué programa
+debe interpretar el archivo. Al ejecutar ./script.sh, el sistema lee
+esa línea y usa /bin/bash.
+Si lo ejecutas con `bash script.sh`, el shebang no hace falta, pero
+es buena costumbre ponerlo.
+
+Las demás líneas que empiezan por # son comentarios: bash las ignora.
+Sirven para explicar el código.
+
+Formas de ejecutar:
+  bash hola.sh        bash lee el archivo; no necesita permiso de ejecución
+  chmod +x hola.sh    añade permiso de ejecución
+  ./hola.sh           lo ejecuta directamente (usa el shebang)
+
+Comprobar la sintaxis sin ejecutar:
+  bash -n hola.sh
+
+Un script no es magia: es texto. Puedes verlo con cat y editarlo.
+TEXTO
+)" || return 1
+    pausa || return 1
+
+    pantalla "Nivel 0 · Demo" "Vamos a hacerlo todo junto, paso a paso.
+No tienes que escribir nada todavía: solo mira y pulsa Enter." ""
     demo_00
     pausa || return 1
 

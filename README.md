@@ -5,6 +5,9 @@ pantallas, XP, desbloqueos y retos que se validan solos.
 
 > **Estado:** Fase 1 completada (motor) y pilotos jugables de los niveles 0, 1, 2 y 4.
 > El resto del temario está en construcción.
+>
+> El nivel 0 está pensado para empezar sin saber nada: terminal y carpetas, extensiones
+> (`.sh` y `.txt`), comillas, redirecciones y tu primer script.
 
 ## Requisitos
 
