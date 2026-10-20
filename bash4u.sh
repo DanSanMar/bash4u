@@ -417,7 +417,7 @@ bucle_reto() {
 
 Escribe tu solución, una línea por vez.
 Cuando termines, escribe una línea con solo:   # fin
-Si te atascas: :pista   ·   Ver tu código: :ver   ·   Empezar de nuevo: :borrar" "Pista: ${R_PISTA}"
+Si te atascas: :pista   ·   Ver tu código: :ver   ·   Empezar de nuevo: :borrar"
 
         while true; do
             printf '%s' "${C_PROMPT}> ${C_RESET}"
