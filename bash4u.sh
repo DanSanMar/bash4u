@@ -670,7 +670,39 @@ printf "%s\n" "${progreso[@]}"'
 
 # ------------------------------------------------------------ nivel 0 --------
 
-demo_00() {
+demo_00_comillas() {
+    printf '%s\n' "→ Comillas dobles: agrupan el texto y conservan los espacios."
+    printf '%s\n' '  echo "Hola,   mundo"'
+    echo "Hola,   mundo"
+
+    printf '%s\n' "→ Comillas simples: también conservan los espacios."
+    printf '%s\n' "  echo 'Hola,   mundo'"
+    echo 'Hola,   mundo'
+
+    printf '%s\n' "→ Sin comillas: bash separa por espacios y solo queda uno."
+    printf '%s\n' "  echo Hola,   mundo"
+    echo Hola,   mundo
+
+    printf '%s\n' "→ Las dobles expanden \$HOME; las simples lo dejan literal."
+    printf '%s\n' '  echo "Vivo en $HOME"'
+    echo "Vivo en $HOME"
+    printf '%s\n' "  echo 'Vivo en \$HOME'"
+    echo 'Vivo en $HOME'
+
+    printf '%s\n' '→ La barra invertida permite imprimir una comilla doble:'
+    printf '%s\n' '  echo "Él dijo \"hola\""'
+    echo "Él dijo \"hola\""
+
+    printf '%s\n' '→ Y un dólar literal dentro de comillas dobles:'
+    printf '%s\n' '  echo "Cuesta \$5"'
+    echo "Cuesta \$5"
+
+    printf '%s\n' "→ Las comillas no se imprimen: solo agrupan el texto."
+    printf '%s\n' "  echo '\"Hola\"'"
+    echo '"Hola"'
+}
+
+demo_00_resto() {
     local tmp
     tmp=$(mktemp -d) || return 0
     (
@@ -685,12 +717,6 @@ demo_00() {
 
         printf '%s\n' "→ echo imprime texto:"
         echo "Hola, bash"
-
-        printf '%s\n' "→ las comillas dobles conservan los espacios:"
-        echo "Hola,   mundo"
-
-        printf '%s\n' "→ sin comillas, bash parte el texto por espacios y los colapsa:"
-        echo Hola,   mundo
 
         printf '%s\n' "→ > envía la salida a un archivo; no se ve en pantalla:"
         printf '%s\n' "Hola, archivo" > saludo.txt
@@ -715,6 +741,12 @@ demo_00() {
         ./hola.sh
     )
     rm -rf "$tmp"
+}
+
+# El self-test ejecuta demo_00; el nivel 0 llama a las dos partes por separado.
+demo_00() {
+    demo_00_comillas
+    demo_00_resto
 }
 
 reto_00_1() {
@@ -751,11 +783,14 @@ esta línea, con TRES espacios entre «Hola,» y «mundo»:
 Hola,   mundo
      ^^^ tres espacios, no uno
 
-Usa comillas dobles alrededor del texto. El curso guardará el archivo
-y lo ejecutará con bash." \
+Usa comillas dobles alrededor del texto (las simples también
+conservarían los espacios; en la solución usamos dobles).
+La salida no lleva comillas: las comillas solo agrupan el texto
+y no se imprimen. El curso guardará el archivo y lo ejecutará con bash." \
         "echo \"Hola,   mundo\"
 Las comillas dobles conservan los espacios. Sin comillas, bash separa
-el texto por espacios y los convierte en uno solo." \
+el texto por espacios y los convierte en uno solo.
+La salida debe ser Hola,   mundo (sin comillas alrededor)." \
         '#!/bin/bash
 echo "Hola,   mundo"' \
         '#!/bin/bash
@@ -832,7 +867,7 @@ TEXTO
 )" || return 1
     pausa || return 1
 
-    pantalla "Nivel 0 · Parte 2" "Archivos, extensiones y comillas" ""
+    pantalla "Nivel 0 · Parte 2" "Archivos y extensiones" ""
     paginar "$(cat <<'TEXTO'
 Un archivo guarda texto o datos. Su nombre suele terminar en una
 extensión: la parte que va después del último punto.
@@ -852,25 +887,93 @@ sepáis qué esperar. Por eso:
 Crear texto en pantalla:
   echo "Hola"             imprime Hola y un salto de línea
   printf '%s\n' "Hola"    imprime con formato; más predecible
-
-Comillas y espacios:
-  echo "Hola,   mundo"    conserva los tres espacios
-  echo 'Hola,   mundo'    también los conserva
-  echo Hola,   mundo      bash separa por espacios y los colapsa
-
-  "..."  comillas dobles: agrupan el texto y permiten expandir $variables
-         (las variables llegan en el nivel 1; por ahora basta con los espacios)
-  '...'  comillas simples: agrupan el texto y todo es literal
-  \      barra invertida: escapa el carácter siguiente
-         "Él dijo \"hola\""   imprime: Él dijo "hola"
-         "Cuesta \$5"         imprime: Cuesta $5
-
-Regla práctica: si el texto lleva espacios, ponlo entre comillas.
 TEXTO
 )" || return 1
     pausa || return 1
 
-    pantalla "Nivel 0 · Parte 3" "Redirigir la salida a un archivo" ""
+    pantalla "Nivel 0 · Parte 3" "Comillas y argumentos" ""
+    paginar "$(cat <<'TEXTO'
+Las comillas no se imprimen: son instrucciones para bash.
+Sirven para decidir dónde empieza y dónde termina un argumento.
+Un argumento es cada trozo de texto que recibe un comando.
+
+Cuando escribes sin comillas:
+  echo Hola,   mundo
+bash parte la línea por los espacios. Ve dos argumentos:
+  1) Hola,
+  2) mundo
+Después echo los imprime separados por un solo espacio:
+  Hola, mundo
+
+No es echo quien borra los espacios: bash ya los usó como separadores
+antes de ejecutar echo. echo solo recibe dos palabras y las junta.
+
+Con comillas dobles:
+  echo "Hola,   mundo"
+bash ve UN solo argumento que contiene los tres espacios.
+echo lo imprime tal cual:
+  Hola,   mundo
+
+Con comillas simples pasa lo mismo con los espacios:
+  echo 'Hola,   mundo'
+  Hola,   mundo
+
+Entonces, ¿cuál usar?
+  "..."  comillas dobles: agrupan y permiten expandir $variables
+  '...'  comillas simples: agrupan y todo queda literal
+
+Ejemplo con $HOME, una variable del sistema que guarda tu carpeta
+personal (las variables se explican en el nivel 1; aquí solo mira
+la diferencia):
+  echo "Vivo en $HOME"    → Vivo en /home/arch
+  echo 'Vivo en $HOME'    → Vivo en $HOME
+
+Lo mismo vale para nombres de archivo con espacios:
+  cd Mis documentos       → cd recibe dos argumentos y falla
+  cd "Mis documentos"     → cd recibe uno solo
+
+Para que cuentes los espacios, aquí ␣ representa un espacio:
+  echo "Hola,   mundo"    → Hola,␣␣␣mundo
+  echo Hola,   mundo      → Hola,␣mundo
+
+La barra invertida \ escapa caracteres especiales dentro de comillas
+dobles:
+  \"   imprime una comilla doble
+  \$   imprime un dólar literal, sin expandir una variable
+Por ejemplo:
+  echo "Él dijo \"hola\""  → Él dijo "hola"
+  echo "Cuesta \$5"        → Cuesta $5
+  echo 'Cuesta $5'         → Cuesta $5
+Dentro de comillas simples no hace falta escapar: todo es literal.
+
+Las comillas tampoco forman parte de la salida:
+  echo "Hola"       → Hola
+  echo '"Hola"'     → "Hola"
+  echo "'Hola'"     → 'Hola'
+
+Resumen para un texto con espacios:
+                    ¿un argumento?  ¿conserva espacios?  ¿expande $HOME?
+  sin comillas      no              no                   sí
+  "..."             sí              sí                   sí
+  '...'             sí              sí                   no
+
+Importante: usa comillas rectas ' y ", no las curvas “ ” o ‘ ’.
+Las comillas van alrededor de todo el texto, no de cada palabra.
+
+Regla práctica:
+  - Si el texto lleva espacios, ponlo entre comillas.
+  - Usa comillas dobles por defecto.
+  - Usa comillas simples si quieres que $ y \ sean literales.
+TEXTO
+)" || return 1
+    pausa || return 1
+
+    pantalla "Nivel 0 · Demo de comillas" "Mira la diferencia entre usar comillas y no usarlas.
+No tienes que escribir nada: solo observa y pulsa Enter." ""
+    demo_00_comillas
+    pausa || return 1
+
+    pantalla "Nivel 0 · Parte 4" "Redirigir la salida a un archivo" ""
     paginar "$(cat <<'TEXTO'
 La salida normal de un comando se llama stdout y va a la pantalla.
 Puedes redirigirla a un archivo con >:
@@ -899,7 +1002,7 @@ TEXTO
 )" || return 1
     pausa || return 1
 
-    pantalla "Nivel 0 · Parte 4" "Tu primer script" ""
+    pantalla "Nivel 0 · Parte 5" "Tu primer script" ""
     paginar "$(cat <<'TEXTO'
 Un script es un archivo de texto con órdenes de bash, una por línea.
 
@@ -928,9 +1031,9 @@ TEXTO
 )" || return 1
     pausa || return 1
 
-    pantalla "Nivel 0 · Demo" "Vamos a hacerlo todo junto, paso a paso.
+    pantalla "Nivel 0 · Demo final" "Ahora vemos archivos, redirecciones y scripts paso a paso.
 No tienes que escribir nada todavía: solo mira y pulsa Enter." ""
-    demo_00
+    demo_00_resto
     pausa || return 1
 
     if ejecutar_retos_de 0; then
