@@ -1,0 +1,7 @@
+# Archivos de agentes (convención del workspace: no se versionan)
+AGENTS.md
+
+# Temporales
+*.swp
+*.tmp
+.DS_Store
