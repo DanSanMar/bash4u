@@ -54,6 +54,7 @@ R_MALA=""
 R_FIXTURE=""
 R_TIMEOUT=5
 R_CASOS=()
+R_CHEQUEO=""
 DETALLE_FALLO=""
 STTY_ORIG=""
 
@@ -350,6 +351,15 @@ ejecutar_codigo() {
         fi
     done
 
+    # Comprobación opcional del resultado (archivos creados, permisos, etc.).
+    if [[ -n $R_CHEQUEO ]]; then
+        if ! ( cd "$sandbox" && bash -c "$R_CHEQUEO" ) >/dev/null 2>&1; then
+            DETALLE_FALLO="la salida es correcta, pero el resultado no cumple: ${R_CHEQUEO}"
+            rm -rf "$sandbox"
+            return 1
+        fi
+    fi
+
     rm -rf "$sandbox"
     return 0
 }
@@ -364,6 +374,7 @@ definir_reto() {
     R_MALA=$5
     R_FIXTURE=${6:-}
     R_TIMEOUT=${7:-5}
+    R_CHEQUEO=""
     shift 7
     R_CASOS=("$@")
 }
@@ -478,6 +489,8 @@ TITULOS=(
 )
 
 LECCIONES=(
+    "0|La terminal y tu primer script|leccion_00"
+    "1|Variables y comillas|leccion_01"
     "2|Entrada, salida y códigos de estado|leccion_02"
     "4|Bucles y menús|leccion_04"
 )
@@ -585,6 +598,214 @@ printf "%s\n" "${progreso[@]}"'
         pausa
     fi
     return 0
+}
+
+# ------------------------------------------------------------ nivel 0 --------
+
+demo_00() {
+    local tmp
+    tmp=$(mktemp -d) || return 0
+    (
+        cd "$tmp" || exit 0
+
+        printf '%s\n' "→ pwd muestra el directorio actual:"
+        pwd
+
+        printf '%s\n' "→ creamos hola.sh con una redirección"
+        printf '%s\n' '#!/bin/bash' 'echo "Hola, bash"' > hola.sh
+
+        printf '%s\n' "→ contenido del archivo:"
+        cat hola.sh
+
+        printf '%s\n' "→ se ejecuta con bash:"
+        bash hola.sh
+
+        printf '%s\n' "→ bash -n comprueba la sintaxis sin ejecutar:"
+        bash -n hola.sh && printf '%s\n' "sintaxis ok"
+
+        chmod +x hola.sh
+        printf '%s\n' "→ con permiso de ejecución también funciona así:"
+        ./hola.sh
+    )
+    rm -rf "$tmp"
+}
+
+reto_00_1() {
+    definir_reto \
+        "0.1" \
+        "Crea un archivo llamado hola.sh con este contenido:
+#!/bin/bash
+echo \"Hola, bash\"
+
+Después ejecútalo con bash hola.sh.
+
+La salida debe ser exactamente:
+Hola, bash" \
+        "Usa printf o echo con > para crear el archivo y luego bash hola.sh.
+Ojo: > sobrescribe el archivo; >> añade al final." \
+        'printf "%s\n" "#!/bin/bash" "echo \"Hola, bash\"" > hola.sh
+bash hola.sh' \
+        'echo "Hola, bash"' \
+        '' 5 \
+        "|Hola, bash|0"
+    R_CHEQUEO='[[ -f hola.sh ]] && grep -q "Hola, bash" hola.sh'
+}
+
+RETOS_00=(reto_00_1)
+
+leccion_00() {
+    pantalla "Nivel 0 · ${TITULOS[0]}" "" "Escribe tu solución al final de la teoría."
+    paginar "La terminal es una conversación con el sistema: cada línea que escribes
+es un comando, y bash es el programa que los interpreta.
+
+• pwd                 muestra el directorio actual.
+• ls                  lista el contenido.
+• cd carpeta          cambia de directorio; cd .. sube uno.
+• /home/arch/...      ruta absoluta; hola.sh es relativa al directorio actual.
+• echo texto          imprime; printf es más predecible con formatos.
+• cmd > archivo       redirige la salida y sobrescribe el archivo.
+• cmd >> archivo      añade al final sin borrar lo anterior.
+
+Un script es un archivo de texto con comandos. Su primera línea,
+#!/bin/bash, indica qué intérprete debe usarlo.
+
+Se ejecuta con:
+  bash script.sh
+y, si tiene permiso de ejecución (chmod +x), también con:
+  ./script.sh
+
+Antes de ejecutar conviene comprobar la sintaxis con bash -n script.sh." \
+        || return 1
+
+    demo_00
+    pausa || return 1
+
+    if ejecutar_retos_de 0; then
+        finalizar_leccion 0
+        return 0
+    fi
+
+    pantalla "Nivel 0" "Aún quedan retos pendientes.
+Los tienes guardados en el repaso adaptativo." "Enter para volver"
+    pausa
+    return 1
+}
+
+# ------------------------------------------------------------ nivel 1 --------
+
+demo_01() {
+    local nombre="Ada" edad=36
+
+    printf '%s\n' "→ asignación: sin espacios alrededor del ="
+    printf 'nombre=%s edad=%s\n' "$nombre" "$edad"
+
+    printf '%s\n' "→ las comillas dobles expanden; las simples no"
+    printf 'dobles: hola %s\n' "$nombre"
+    printf 'simples: hola $nombre\n'
+
+    printf '%s\n' "→ las llaves separan la variable del texto"
+    printf '%s\n' "${nombre}ismo"
+
+    printf '%s\n' "→ aritmética entera con \$(( ))"
+    printf 'edad + 4 = %s\n' "$((edad + 4))"
+
+    printf '%s\n' "→ read -r lee una línea (aquí desde una cadena)"
+    local leido
+    read -r leido <<< "Linus"
+    printf 'leído: %s\n' "$leido"
+}
+
+reto_01_1() {
+    definir_reto \
+        "1.1" \
+        "Lee dos números, uno por línea, y calcula su suma y su producto.
+
+Imprime exactamente:
+suma: N
+producto: M
+
+Ejemplo: si la entrada es 3 y 4, la salida debe ser:
+suma: 7
+producto: 12" \
+        "read -r a y read -r b; después \$((a + b)) y \$((a * b))." \
+        'read -r a
+read -r b
+echo "suma: $((a + b))"
+echo "producto: $((a * b))"' \
+        'read -r a
+read -r b
+echo "suma: $a"
+echo "producto: $b"' \
+        '' 5 \
+        "3
+4|suma: 7
+producto: 12|0" \
+        "0
+5|suma: 5
+producto: 0|0" \
+        "-2
+3|suma: 1
+producto: -6|0"
+}
+
+reto_01_2() {
+    definir_reto \
+        "1.2" \
+        "Lee una frase que puede tener espacios al principio y varios espacios
+seguidos. Imprime exactamente:
+Frase: <frase>
+
+Conserva los espacios tal cual. Ejemplo: si la entrada es
+«  hola   mundo», la salida debe ser «Frase:   hola   mundo»." \
+        "Usa IFS= read -r frase y rodea \$frase con comillas dobles." \
+        'IFS= read -r frase
+echo "Frase: $frase"' \
+        'read frase
+echo Frase: $frase' \
+        '' 5 \
+        "  hola   mundo|Frase:   hola   mundo|0"
+}
+
+RETOS_01=(reto_01_1 reto_01_2)
+
+leccion_01() {
+    pantalla "Nivel 1 · ${TITULOS[1]}" "" "Escribe tu solución al final de la teoría."
+    paginar "Una variable guarda un valor con un nombre. En bash se asigna así:
+
+  nombre=Ada          (sin espacios alrededor del =)
+
+Para usar el valor se pone \$ delante:
+
+  echo \"\$nombre\"      → Ada
+  echo '\$nombre'      → \$nombre   (las comillas simples son literales)
+
+Las comillas dobles expanden variables; las simples no. Rodea SIEMPRE
+las variables con comillas dobles para no perder espacios:
+  echo \"\$frase\"       conserva los espacios
+  echo \$frase         los colapsa
+
+Las llaves sirven para separar el nombre del texto que va detrás:
+  echo \"\${nombre}ismo\"
+
+La aritmética entera va entre \$(( )):
+  edad=\$((2026 - 1990))
+
+Y read -r lee una línea. IFS= read -r conserva los espacios al principio
+y al final de la línea." \
+        || return 1
+
+    demo_01
+    pausa || return 1
+
+    if ejecutar_retos_de 1; then
+        finalizar_leccion 1
+        return 0
+    fi
+
+    pantalla "Nivel 1" "Aún quedan retos pendientes.
+Los tienes guardados en el repaso adaptativo." "Enter para volver"
+    pausa
+    return 1
 }
 
 # ------------------------------------------------------------ nivel 2 --------

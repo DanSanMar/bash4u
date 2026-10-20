@@ -3,7 +3,7 @@
 Curso interactivo de Bash scripting **de cero a experto**, con formato de videojuego:
 pantallas, XP, desbloqueos y retos que se validan solos.
 
-> **Estado:** Fase 1 completada (motor) y pilotos jugables de los niveles 2 y 4.
+> **Estado:** Fase 1 completada (motor) y pilotos jugables de los niveles 0, 1, 2 y 4.
 > El resto del temario está en construcción.
 
 ## Requisitos
