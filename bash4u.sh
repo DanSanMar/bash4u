@@ -471,6 +471,11 @@ Si te atascas: :pista   ·   Ver tu código: :ver   ·   Empezar de nuevo: :borr
         fi
 
         if ejecutar_codigo "$codigo"; then
+            local nuevo=0
+            if ! lista_contiene "$EST_RETOS" "$R_ID"; then
+                nuevo=1
+            fi
+
             guardado=""
             if [[ -n $R_ARCHIVO ]]; then
                 if mkdir -p "$DIR_PRACTICAS" 2>/dev/null \
@@ -480,9 +485,14 @@ Si te atascas: :pista   ·   Ver tu código: :ver   ·   Empezar de nuevo: :borr
             fi
             EST_RETOS=$(agregar_lista "$EST_RETOS" "$R_ID")
             EST_PENDIENTES=$(quitar_lista "$EST_PENDIENTES" "$R_ID")
-            sumar_xp "$xp"
 
-            cuerpo="✔ Correcto. +${xp} XP"
+            if (( nuevo )); then
+                sumar_xp "$xp"
+                cuerpo="✔ Correcto. +${xp} XP"
+            else
+                cuerpo="✔ Correcto. Ya lo tenías superado; no suma XP de nuevo."
+            fi
+
             [[ -n $R_LOGRO ]] && cuerpo+=$'\n'$'\n'"${R_LOGRO}"
             [[ -n $guardado ]] && cuerpo+=$'\n'$'\n'"${guardado}"
             pantalla "Reto ${R_ID} superado" "$cuerpo" "Enter para continuar"
