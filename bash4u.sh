@@ -54,6 +54,7 @@ R_MALA=""
 R_FIXTURE=""
 R_TIMEOUT=5
 R_CASOS=()
+R_ARCHIVO=""
 R_CHEQUEO=""
 DETALLE_FALLO=""
 STTY_ORIG=""
@@ -316,9 +317,10 @@ ejecutar_codigo() {
         return 1
     fi
 
-    local sandbox
+    local sandbox programa="reto.sh"
     sandbox=$(mktemp -d) || { DETALLE_FALLO="no se pudo crear el sandbox"; return 1; }
-    printf '%s\n' "$codigo" > "$sandbox/reto.sh"
+    [[ -n $R_ARCHIVO ]] && programa=$R_ARCHIVO
+    printf '%s\n' "$codigo" > "$sandbox/$programa"
 
     if [[ -n $R_FIXTURE ]]; then
         ( cd "$sandbox" && bash -c "$R_FIXTURE" ) >/dev/null 2>&1
@@ -339,13 +341,24 @@ ejecutar_codigo() {
         # poder llenar la memoria ni la pantalla.
         : > "$archivo_salida"
         ( cd "$sandbox" && printf '%s\n' "$entrada" \
-            | timeout -k 1 "$R_TIMEOUT" bash reto.sh >"$archivo_salida" 2>/dev/null )
+            | timeout -k 1 "$R_TIMEOUT" bash "$programa" >"$archivo_salida" 2>/dev/null )
         exit_real=$?
         salida=$(head -c 100000 "$archivo_salida" 2>/dev/null)
 
         if [[ "$(normalizar "$salida")" != "$(normalizar "$esperado")" ]] \
             || (( exit_real != exit_esperado )); then
-            DETALLE_FALLO="entrada «${entrada}» → esperado «${esperado}» (exit ${exit_esperado}); obtenido «${salida}» (exit ${exit_real})"
+            local mostrado=${esperado:-"(sin salida)"}
+            local obtenido=${salida:-"(sin salida)"}
+            DETALLE_FALLO="Esperaba:
+${mostrado}
+(código de salida ${exit_esperado})
+
+Obtuve:
+${obtenido}
+(código de salida ${exit_real})"
+            if (( exit_real == 124 )); then
+                DETALLE_FALLO+=$'\n'"Tu script no terminó en ${R_TIMEOUT} s (¿un bucle sin salida?)."
+            fi
             rm -rf "$sandbox"
             return 1
         fi
@@ -354,7 +367,7 @@ ejecutar_codigo() {
     # Comprobación opcional del resultado (archivos creados, permisos, etc.).
     if [[ -n $R_CHEQUEO ]]; then
         if ! ( cd "$sandbox" && bash -c "$R_CHEQUEO" ) >/dev/null 2>&1; then
-            DETALLE_FALLO="la salida es correcta, pero el resultado no cumple: ${R_CHEQUEO}"
+            DETALLE_FALLO="la salida es correcta, pero falta el archivo o el efecto esperado"
             rm -rf "$sandbox"
             return 1
         fi
@@ -374,6 +387,7 @@ definir_reto() {
     R_MALA=$5
     R_FIXTURE=${6:-}
     R_TIMEOUT=${7:-5}
+    R_ARCHIVO=""
     R_CHEQUEO=""
     shift 7
     R_CASOS=("$@")
@@ -383,15 +397,15 @@ bucle_reto() {
     local xp=${1:-10}
     local intentos=0 max=3
     local -a lineas=()
-    local linea codigo
+    local linea codigo limpia
 
     while (( intentos < max )); do
         lineas=()
         pantalla "Reto ${R_ID}" "${R_ENUNCIADO}
 
 Escribe tu solución, una línea por vez.
-Termina con una línea que contenga solo:   # fin
-Comandos:  :ver   :borrar   :pista   :cancelar" "Pista: ${R_PISTA}"
+Cuando termines, escribe una línea con solo:   # fin
+Si te atascas: :pista   ·   Ver tu código: :ver   ·   Empezar de nuevo: :borrar" "Pista: ${R_PISTA}"
 
         while true; do
             printf '%s' "${C_PROMPT}> ${C_RESET}"
@@ -401,8 +415,12 @@ Comandos:  :ver   :borrar   :pista   :cancelar" "Pista: ${R_PISTA}"
                 return 1
             fi
 
-            case $linea in
-                "# fin") break ;;
+            limpia=$linea
+            limpia=${limpia#"${limpia%%[![:space:]]*}"}
+            limpia=${limpia%"${limpia##*[![:space:]]}"}
+
+            case $limpia in
+                "# fin"|"#fin") break ;;
                 ":ver")
                     if (( ${#lineas[@]} )); then
                         printf '%s\n' "${lineas[@]}"
@@ -433,8 +451,19 @@ Comandos:  :ver   :borrar   :pista   :cancelar" "Pista: ${R_PISTA}"
         fi
 
         codigo=$(printf '%s\n' "${lineas[@]}")
+        if [[ -n $R_ARCHIVO ]]; then
+            while [[ $codigo == $'\n'* ]]; do
+                codigo=${codigo#$'\n'}
+            done
+        fi
         if ejecutar_codigo "$codigo"; then
             printf '%s\n' "${C_OK}✔ Correcto. +${xp} XP${C_RESET}"
+            if [[ -n $R_ARCHIVO ]]; then
+                if mkdir -p "$DIR_PRACTICAS" 2>/dev/null \
+                    && printf '%s\n' "$codigo" > "$DIR_PRACTICAS/$R_ARCHIVO"; then
+                    printf '%s\n' "Guardado en ${DIR_PRACTICAS}/${R_ARCHIVO}"
+                fi
+            fi
             EST_RETOS=$(agregar_lista "$EST_RETOS" "$R_ID")
             EST_PENDIENTES=$(quitar_lista "$EST_PENDIENTES" "$R_ID")
             sumar_xp "$xp"
@@ -633,25 +662,41 @@ demo_00() {
 reto_00_1() {
     definir_reto \
         "0.1" \
-        "Crea un archivo llamado hola.sh con este contenido:
-#!/bin/bash
-echo \"Hola, bash\"
+        "Escribe el contenido de tu primer script.
 
-Después ejecútalo con bash hola.sh.
-
-La salida debe ser exactamente:
+El curso lo guardará como hola.sh y lo ejecutará con bash.
+Debe imprimir exactamente:
 Hola, bash" \
-        "Usa printf o echo con > para crear el archivo y luego bash hola.sh.
-Ojo: > sobrescribe el archivo; >> añade al final." \
-        'printf "%s\n" "#!/bin/bash" "echo \"Hola, bash\"" > hola.sh
-bash hola.sh' \
-        'echo "Hola, bash"' \
+        "Un script empieza con la línea #!/bin/bash y usa echo para imprimir.
+No tienes que crear el archivo: escribe solo su contenido." \
+        '#!/bin/bash
+echo "Hola, bash"' \
+        'echo "Adiós"' \
         '' 5 \
         "|Hola, bash|0"
-    R_CHEQUEO='[[ -f hola.sh ]] && grep -q "Hola, bash" hola.sh'
+    R_ARCHIVO="hola.sh"
 }
 
-RETOS_00=(reto_00_1)
+reto_00_2() {
+    definir_reto \
+        "0.2" \
+        "Crea un archivo llamado saludo.txt cuyo contenido sea exactamente
+esta línea:
+
+Hola, bash
+
+Usa una redirección. No imprimas nada por pantalla: el texto debe
+quedar dentro del archivo." \
+        "printf '%s\\n' \"Hola, bash\" > saludo.txt
+El símbolo > envía la salida a un archivo en vez de a la pantalla." \
+        'printf "%s\n" "Hola, bash" > saludo.txt' \
+        'printf "%s\n" "Hola, bash" > saludo.txt.bak' \
+        '' 5 \
+        "||0"
+    R_CHEQUEO='[[ -f saludo.txt ]] && [[ "$(cat saludo.txt)" == "Hola, bash" ]]'
+}
+
+RETOS_00=(reto_00_1 reto_00_2)
 
 leccion_00() {
     pantalla "Nivel 0 · ${TITULOS[0]}" "" "Escribe tu solución al final de la teoría."
