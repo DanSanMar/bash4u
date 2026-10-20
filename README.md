@@ -3,8 +3,8 @@
 Curso interactivo de Bash scripting **de cero a experto**, con formato de videojuego:
 pantallas, XP, desbloqueos y retos que se validan solos.
 
-> **Estado:** en construcción. Fase 1 (motor) en desarrollo; los niveles 2 y 4 son los
-> primeros pilotos jugables.
+> **Estado:** Fase 1 completada (motor) y pilotos jugables de los niveles 2 y 4.
+> El resto del temario está en construcción.
 
 ## Requisitos
 
@@ -14,14 +14,16 @@ pantallas, XP, desbloqueos y retos que se validan solos.
 ## Uso
 
 ```bash
-bash bash4u.sh              # empezar o continuar
-bash bash4u.sh --lista      # ver el estado de los niveles
-bash bash4u.sh --leccion 2  # ir directo a un nivel
-bash bash4u.sh --self-test  # verificar que el propio curso funciona
+./bash4u.sh                   # empezar o continuar
+./bash4u.sh --lista           # ver el estado de los niveles
+./bash4u.sh --leccion 2       # ir directo a un nivel
+./bash4u.sh --solucion 2      # ver la solución de referencia
+./bash4u.sh --self-test       # verificar que el propio curso funciona
 ```
 
-Opciones útiles: `--plano` (sin colores ni pantalla completa), `--rapido` (sin animaciones),
-`--stage N` (previsualizar una etapa de la interfaz) y `--reset-progress`.
+También funciona con `bash bash4u.sh ...`. Opciones útiles: `--plano` (sin colores ni
+pantalla completa), `--rapido` (sin animaciones), `--stage N` (previsualizar una etapa de
+la interfaz) y `--reset-progress`.
 
 ## Cómo funciona
 
