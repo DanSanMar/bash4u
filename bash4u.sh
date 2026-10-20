@@ -12,7 +12,7 @@
 
 set -uo pipefail
 
-VERSION="0.3.0"
+VERSION="0.3.1"
 DIR_DATOS="${XDG_DATA_HOME:-$HOME/.local/share}/bash4u"
 ARCH_ESTADO="$DIR_DATOS/estado"
 DIR_PRACTICAS="${BASH4U_PRACTICAS:-$HOME/bash4u-practicas}"
@@ -269,6 +269,43 @@ pausa() {
     return 0
 }
 
+# Comandos disponibles en las pausas de una lección:
+#   Enter     avanzar
+#   :atras    volver a la pantalla o parte anterior
+#   :inicio   empezar la lección desde el principio
+#   :salir    volver al menú sin cerrar el programa
+# Devuelve 0, 2, 3 o 4; 1 si se cierra la entrada.
+leer_comando_nav() {
+    local linea
+    if ! IFS= read -r -e linea; then
+        return 1
+    fi
+    case $linea in
+        "") return 0 ;;
+        :atras|:atrás) return 2 ;;
+        :inicio|:reiniciar) return 3 ;;
+        :salir) return 4 ;;
+        *)
+            printf '%s\n' "${C_GRIS}  Usa Enter, :atras, :inicio o :salir.${C_RESET}"
+            return 5
+            ;;
+    esac
+}
+
+pausa_nav() {
+    [[ $AUTOTEST -eq 1 ]] && return 0
+    [[ -t 0 ]] || return 0
+
+    local rc
+    while true; do
+        printf '%s' "${C_GRIS}(Enter) :atras :inicio :salir${C_RESET} "
+        leer_comando_nav
+        rc=$?
+        (( rc == 5 )) && continue
+        return $rc
+    done
+}
+
 # Pinta un texto con una animación muy leve (se desactiva en tests y en modo plano).
 escribir() {
     local texto=$1 i
@@ -296,7 +333,7 @@ paginar() {
         resto=${resto#*$'\n'}
     done
     lineas+=("$resto")
-    local total=${#lineas[@]} i=0 por_pagina=18 fin
+    local total=${#lineas[@]} i=0 por_pagina=18 fin inicio rc
 
     if [[ $MODO_PLANO -eq 0 && -t 1 ]] && command -v tput >/dev/null 2>&1; then
         por_pagina=$(($(tput lines 2>/dev/null || printf '24') - 9))
@@ -304,6 +341,7 @@ paginar() {
     (( por_pagina < 6 )) && por_pagina=6
 
     while (( i < total )); do
+        inicio=$i
         fin=$((i + por_pagina))
         (( fin > total )) && fin=$total
         printf '%s\n' "${lineas[@]:i:fin-i}"
@@ -311,8 +349,25 @@ paginar() {
         if (( i < total )); then
             [[ $AUTOTEST -eq 1 ]] && continue
             [[ -t 0 ]] || continue
-            printf '%s' "${C_GRIS}-- Más -- (Enter)${C_RESET} "
-            IFS= read -r -e _ || return 1
+            while true; do
+                printf '%s' "${C_GRIS}-- Más -- (Enter) :atras :inicio :salir${C_RESET} "
+                leer_comando_nav
+                rc=$?
+                case $rc in
+                    0) break ;;
+                    2)
+                        if (( inicio > 0 )); then
+                            i=$((inicio - por_pagina))
+                            (( i < 0 )) && i=0
+                        else
+                            return 2
+                        fi
+                        break
+                        ;;
+                    1|3|4) return $rc ;;
+                    5) continue ;;
+                esac
+            done
         fi
     done
     return 0
@@ -605,6 +660,31 @@ Este nivel todavía no está disponible en la versión ${VERSION}." "Enter para 
     "$fn"
 }
 
+# Recorre una lista de funciones de paso. Cada paso pinta su pantalla y
+# devuelve 0; la pausa posterior permite avanzar, volver, reiniciar o salir.
+# Si paginar devuelve 2 (atrás en la primera página), se vuelve al paso anterior.
+recorrer_pasos() {
+    local -n pasos=$1
+    local i=0 total=${#pasos[@]} rc
+
+    while (( i < total )); do
+        "${pasos[i]}"
+        rc=$?
+        if (( rc == 0 )); then
+            pausa_nav
+            rc=$?
+        fi
+        case $rc in
+            0) i=$((i + 1)) ;;
+            2) (( i > 0 )) && i=$((i - 1)) ;;
+            3) i=0 ;;
+            4) return 4 ;;
+            *) return 1 ;;
+        esac
+    done
+    return 0
+}
+
 siguiente_leccion() {
     local n fn
     for (( n = 0; n <= 12; n++ )); do
@@ -845,12 +925,15 @@ El símbolo > escribe la salida en un archivo en vez de en la pantalla." \
 
 RETOS_00=(reto_00_1 reto_00_2 reto_00_3)
 
-leccion_00() {
+paso_00_intro() {
     pantalla "Nivel 0 · ${TITULOS[0]}" "Vamos despacio, desde el principio.
 No hace falta saber nada de programación.
-Al final escribirás y ejecutarás tus propios archivos." "Enter para empezar"
-    pausa || return 1
+Al final escribirás y ejecutarás tus propios archivos.
 
+Atajos: Enter avanza · :atras vuelve · :inicio reinicia · :salir sale." "Enter para empezar"
+}
+
+paso_00_terminal() {
     pantalla "Nivel 0 · Parte 1" "La terminal y las carpetas" ""
     paginar "$(cat <<'TEXTO'
 La terminal es una ventana donde escribes órdenes.
@@ -885,9 +968,10 @@ Hay dos formas de escribir una ruta:
 Truco: si un nombre lleva espacios, ponlo entre comillas.
   cd "Mis documentos"
 TEXTO
-)" || return 1
-    pausa || return 1
+)"
+}
 
+paso_00_archivos() {
     pantalla "Nivel 0 · Parte 2" "Archivos y extensiones" ""
     paginar "$(cat <<'TEXTO'
 Un archivo guarda texto o datos. Su nombre suele terminar en una
@@ -908,9 +992,10 @@ sepáis qué esperar. Por eso:
 Crear texto en pantalla:
   echo "Hola"             imprime Hola y un salto de línea
 TEXTO
-)" || return 1
-    pausa || return 1
+)"
+}
 
+paso_00_comillas() {
     pantalla "Nivel 0 · Parte 3" "Comillas y argumentos" ""
     paginar "$(cat <<'TEXTO'
 Las comillas agrupan el texto en un solo argumento y no se imprimen.
@@ -943,14 +1028,16 @@ Regla práctica: si el texto lleva espacios, ponlo entre comillas.
 Usa dobles por defecto; simples si quieres que $ y \ sean literales.
 Usa comillas rectas ' y ", no las curvas “ ”.
 TEXTO
-)" || return 1
-    pausa || return 1
+)"
+}
 
+paso_00_demo_comillas() {
     pantalla "Nivel 0 · Demo de comillas" "Mira la diferencia entre usar comillas y no usarlas.
 No tienes que escribir nada: solo observa y pulsa Enter." ""
     demo_00_comillas
-    pausa || return 1
+}
 
+paso_00_redirigir() {
     pantalla "Nivel 0 · Parte 4" "Redirigir la salida a un archivo" ""
     paginar "$(cat <<'TEXTO'
 La salida normal de un comando se llama stdout y va a la pantalla.
@@ -977,9 +1064,10 @@ salvo que indiques una ruta:
 
   echo "Hola" > practica/saludo.txt
 TEXTO
-)" || return 1
-    pausa || return 1
+)"
+}
 
+paso_00_script() {
     pantalla "Nivel 0 · Parte 5" "Tu primer script" ""
     paginar "$(cat <<'TEXTO'
 Un script es un archivo de texto con órdenes de bash, una por línea.
@@ -1006,13 +1094,28 @@ Comprobar la sintaxis sin ejecutar:
 
 Un script no es magia: es texto. Puedes verlo con cat y editarlo.
 TEXTO
-)" || return 1
-    pausa || return 1
+)"
+}
 
+paso_00_demo_final() {
     pantalla "Nivel 0 · Demo final" "Ahora vemos archivos, redirecciones y scripts paso a paso.
 No tienes que escribir nada todavía: solo mira y pulsa Enter." ""
     demo_00_resto
-    pausa || return 1
+}
+
+PASOS_00=(
+    paso_00_intro
+    paso_00_terminal
+    paso_00_archivos
+    paso_00_comillas
+    paso_00_demo_comillas
+    paso_00_redirigir
+    paso_00_script
+    paso_00_demo_final
+)
+
+leccion_00() {
+    recorrer_pasos PASOS_00 || return 1
 
     if ejecutar_retos_de 0; then
         finalizar_leccion 0
@@ -1057,30 +1160,51 @@ demo_01_aritmetica() {
 }
 
 demo_01_read() {
-    echo "→ read -r lee una línea y la guarda en una variable"
-    echo "Linus" | {
-        read -r nombre
-        echo "leído: $nombre"
-    }
+    local nombre ciudad ruta frase interactivo=0
 
-    echo "→ sin -r, read interpreta las barras invertidas"
+    [[ $AUTOTEST -eq 0 && -t 0 ]] && interactivo=1
+
+    echo "→ read sin -p: no imprime nada; espera a que escribas"
+    if (( interactivo )); then
+        echo "Escribe tu nombre y pulsa Enter:"
+        read -r -e nombre || nombre=""
+    else
+        echo "  (demo automática: escribimos Ada por ti)"
+        nombre="Ada"
+    fi
+    echo "Hola, $nombre"
+
+    echo
+    echo "→ read -p: el mensaje y la lectura van en la misma orden"
+    if (( interactivo )); then
+        read -r -e -p "Escribe tu ciudad: " ciudad || ciudad=""
+    else
+        echo "Escribe tu ciudad: Madrid (demo)"
+        ciudad="Madrid"
+    fi
+    echo "ciudad: $ciudad"
+
+    echo
+    echo "→ -r evita que se coman las barras invertidas"
     echo 'C:\Users\arch' | {
         read ruta
-        echo "read:    $ruta"
+        echo "read:     $ruta"
     }
     echo 'C:\Users\arch' | {
         read -r ruta
-        echo "read -r: $ruta"
+        echo "read -r:  $ruta"
     }
 
-    echo "→ IFS= read -r conserva los espacios de los extremos"
-    echo "  hola   mundo  " | {
+    echo
+    echo "→ IFS= read -r copia la línea entera, con sus espacios"
+    echo '  hola   mundo  ' | {
+        read frase
+        echo "read:       [$frase]"
+    }
+    echo '  hola   mundo  ' | {
         IFS= read -r frase
-        echo "frase: [$frase]"
+        echo "IFS= read:  [$frase]"
     }
-
-    echo "→ read -p combina mensaje y lectura (el mensaje se ve en la terminal):"
-    echo '  read -r -p "Nombre: " nombre'
 }
 
 # El self-test ejecuta demo_01; el nivel 1 llama a las tres partes por separado.
@@ -1143,11 +1267,14 @@ echo Frase: $frase' \
 
 RETOS_01=(reto_01_1 reto_01_2)
 
-leccion_01() {
+paso_01_intro() {
     pantalla "Nivel 1 · ${TITULOS[1]}" "Vamos a guardar datos en variables, hacer cuentas
-y leer lo que escribe el usuario." "Enter para empezar"
-    pausa || return 1
+y leer lo que escribe el usuario.
 
+Atajos: Enter avanza · :atras vuelve · :inicio reinicia · :salir sale." "Enter para empezar"
+}
+
+paso_01_variables() {
     pantalla "Nivel 1 · Parte 1" "Variables y comillas" ""
     paginar "$(cat <<'TEXTO'
 Una variable guarda un valor con un nombre. Se asigna así:
@@ -1167,13 +1294,15 @@ Si el valor lleva espacios, ponlo entre comillas al asignarlo:
 Las llaves separan el nombre del texto que va detrás:
   echo "${nombre}ismo"     → Adaismo
 TEXTO
-)" || return 1
-    pausa || return 1
+)"
+}
 
+paso_01_demo_variables() {
     pantalla "Nivel 1 · Demo de variables" "Mira cómo se asigna y se usa una variable." ""
     demo_01_variables
-    pausa || return 1
+}
 
+paso_01_aritmetica() {
     pantalla "Nivel 1 · Parte 2" "Aritmética entera" ""
     paginar "$(cat <<'TEXTO'
 Bash hace aritmética entera, sin decimales, con $(( )):
@@ -1193,46 +1322,76 @@ El resultado se puede guardar en una variable:
 Dentro de $(( )) las variables van sin $:
   $((a + b)) es lo mismo que $(($a + $b)), pero más claro.
 TEXTO
-)" || return 1
-    pausa || return 1
+)"
+}
 
+paso_01_demo_aritmetica() {
     pantalla "Nivel 1 · Demo de aritmética" "Mira las operaciones y cómo se guarda el resultado." ""
     demo_01_aritmetica
-    pausa || return 1
+}
 
+paso_01_read() {
     pantalla "Nivel 1 · Parte 3" "Leer datos con read" ""
     paginar "$(cat <<'TEXTO'
-read lee una línea de la entrada y la guarda en una variable:
+read lee una línea de la entrada y la guarda en una variable.
+Por sí solo no imprime nada: espera a que escribas y pulses Enter.
+
+Forma completa, con el mensaje aparte:
   echo "¿Cómo te llamas?"
   read -r nombre
   echo "Hola, $nombre"
+
+En pantalla:
+  ¿Cómo te llamas?
+  Ada
+  Hola, Ada
+
+read -p muestra el mensaje y lee en la misma orden:
+  read -r -p "¿Cómo te llamas? " nombre
+  echo "Hola, $nombre"
+
+El espacio final del mensaje separa el texto de lo que escribes.
 
 -r significa «raw»: no interpreta las barras invertidas.
   read -r ruta     guarda C:\Users\arch tal cual
   read ruta        se come las barras: C:Usersarch
 Usa -r casi siempre.
 
-read -p muestra un mensaje y lee en la misma orden:
-  read -r -p "¿Cómo te llamas? " nombre
-El espacio final evita que el texto quede pegado a lo que escribes.
-El mensaje de -p solo se ve si hay teclado; en una tubería no.
-
-Para conservar espacios al principio y al final, vacía IFS:
+IFS contiene los separadores que usa read: espacio, tabulador y salto
+de línea. Por eso read recorta los espacios de los extremos. Para copiar
+la línea entera, incluidos esos espacios, vacía IFS solo para esa orden:
   IFS= read -r frase
-Sin IFS=, read recorta esos espacios.
+  echo "[$frase]"
 
-read lee hasta el final de la línea. Si no hay más entrada, devuelve
-un código distinto de 0. En un bucle:
-  while IFS= read -r linea; do
-      echo "$linea"
-  done
+Con la entrada «  hola   mundo  »:
+  read frase           → [hola   mundo]
+  IFS= read -r frase   → [  hola   mundo  ]
+
+El IFS= de delante solo afecta a esa orden; no cambia IFS para siempre.
+
+En un script normal, read sin -p se usa después de un echo.
+En un reto no hace falta -p: la entrada ya llega por la tubería.
 TEXTO
-)" || return 1
-    pausa || return 1
+)"
+}
 
-    pantalla "Nivel 1 · Demo de read" "Mira las diferencias entre read, read -r e IFS= read -r." ""
+paso_01_demo_read() {
+    pantalla "Nivel 1 · Demo de read" "Vamos a probarlo contigo. Después verás -r e IFS=." ""
     demo_01_read
-    pausa || return 1
+}
+
+PASOS_01=(
+    paso_01_intro
+    paso_01_variables
+    paso_01_demo_variables
+    paso_01_aritmetica
+    paso_01_demo_aritmetica
+    paso_01_read
+    paso_01_demo_read
+)
+
+leccion_01() {
+    recorrer_pasos PASOS_01 || return 1
 
     if ejecutar_retos_de 1; then
         finalizar_leccion 1
@@ -1296,8 +1455,14 @@ echo ok' \
 
 RETOS_02=(reto_02_1)
 
-leccion_02() {
-    pantalla "Nivel 2 · ${TITULOS[2]}" "" "Escribe tu solución al final de la teoría."
+paso_02_intro() {
+    pantalla "Nivel 2 · ${TITULOS[2]}" "Un script lee datos, produce salida y dice si salió bien.
+
+Atajos: Enter avanza · :atras vuelve · :inicio reinicia · :salir sale." "Enter para empezar"
+}
+
+paso_02_teoria() {
+    pantalla "Nivel 2 · Teoría" "Entrada, salida y códigos de estado" ""
     paginar "Un script hace tres cosas: leer datos, producir salida y decir si salió bien.
 
 • read -r variable   lee una línea de la entrada estándar.
@@ -1311,11 +1476,22 @@ leccion_02() {
 Regla de oro: un script debe devolver 0 cuando hizo su trabajo,
 y un código distinto de 0 cuando no pudo hacerlo.
 
-En el reto, ojo al detalle: la salida debe ser exactamente la pedida." \
-        || return 1
+En el reto, ojo al detalle: la salida debe ser exactamente la pedida."
+}
 
+paso_02_demo() {
+    pantalla "Nivel 2 · Demo" "Mira printf, los códigos de salida y && / ||." ""
     demo_02
-    pausa || return 1
+}
+
+PASOS_02=(
+    paso_02_intro
+    paso_02_teoria
+    paso_02_demo
+)
+
+leccion_02() {
+    recorrer_pasos PASOS_02 || return 1
 
     if ejecutar_retos_de 2; then
         finalizar_leccion 2
@@ -1460,8 +1636,14 @@ fin|0"
 
 RETOS_04=(reto_04_1 reto_04_2)
 
-leccion_04() {
-    pantalla "Nivel 4 · ${TITULOS[4]}" "" "Escribe tu solución al final de la teoría."
+paso_04_intro() {
+    pantalla "Nivel 4 · ${TITULOS[4]}" "Los bucles repiten trabajo y case elige entre opciones.
+
+Atajos: Enter avanza · :atras vuelve · :inicio reinicia · :salir sale." "Enter para empezar"
+}
+
+paso_04_teoria() {
+    pantalla "Nivel 4 · Teoría" "Bucles y menús" ""
     paginar "Los bucles repiten trabajo y case elige entre opciones.
 
 • for x in lista; do ...; done        recorre elementos.
@@ -1473,11 +1655,22 @@ leccion_04() {
 
 Un menú es un while true que solo termina con break.
 Cuidado: si la entrada se acaba (EOF), read falla y el bucle puede girar sin fin.
-En un menú real, comprueba el resultado de read." \
-        || return 1
+En un menú real, comprueba el resultado de read."
+}
 
+paso_04_demo() {
+    pantalla "Nivel 4 · Demo" "Mira for, while, until, read en bucle y case." ""
     demo_04
-    pausa || return 1
+}
+
+PASOS_04=(
+    paso_04_intro
+    paso_04_teoria
+    paso_04_demo
+)
+
+leccion_04() {
+    recorrer_pasos PASOS_04 || return 1
 
     if ejecutar_retos_de 4; then
         finalizar_leccion 4
@@ -1547,7 +1740,8 @@ menu_principal() {
     while true; do
         pantalla "bash4u · elige un nivel" "$(listado_menu)
 
-${C_GRIS}r) repaso adaptativo ($(contar_pendientes) pendientes)   c) chuletas   q) salir${C_RESET}" "Los niveles 2 y 4 son los pilotos de la Fase 1."
+${C_GRIS}r) repaso adaptativo ($(contar_pendientes) pendientes)   c) chuletas   q) salir
+Dentro de una lección: Enter avanza · :atras vuelve · :inicio reinicia · :salir sale.${C_RESET}" "Los niveles 2 y 4 son los pilotos de la Fase 1."
 
         printf '%s' "${C_PROMPT}Opción: ${C_RESET}"
         if ! IFS= read -r opcion; then
@@ -2166,6 +2360,13 @@ Uso:
   bash bash4u.sh --rapido        sin animaciones
   bash bash4u.sh --si            no pedir confirmación (para scripts)
   bash bash4u.sh --help          esta ayuda
+
+Dentro de una lección:
+  Enter      avanzar
+  :atras     volver a la pantalla o parte anterior
+  :inicio    empezar la lección desde el principio
+  :salir     volver al menú sin cerrar el programa
+  Ctrl+C     salir del programa (emergencia)
 
 Reinicios:
   --reset-progress  borra el estado y empieza de cero; tus scripts se quedan

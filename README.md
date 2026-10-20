@@ -29,6 +29,21 @@ También funciona con `bash bash4u.sh ...`. Opciones útiles: `--plano` (sin col
 pantalla completa), `--rapido` (sin animaciones) y `--stage N` (previsualizar una etapa de
 la interfaz).
 
+## Atajos dentro de una lección
+
+En cada pausa y al final de cada página puedes escribir:
+
+| Atajo | Qué hace |
+|---|---|
+| `Enter` | avanzar |
+| `:atras` | volver a la página o parte anterior |
+| `:inicio` | empezar la lección desde el principio |
+| `:salir` | volver al menú sin cerrar el programa |
+| `Ctrl+C` | salir del programa (solo como emergencia) |
+
+Con `:atras` puedes repasar la teoría y las demos sin perder el progreso. Los atajos
+aparecen en la propia línea de la pausa.
+
 ## Reiniciar el progreso
 
 El progreso del curso no vive dentro del script: vive en un archivo aparte, con líneas
