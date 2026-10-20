@@ -95,6 +95,10 @@ Cada nivel enseña un concepto, lo demuestra con código real y propone retos. E
 escribe su solución dentro del propio script (termina con `# fin`) y el curso la ejecuta
 en un directorio temporal con `timeout`, comparando la salida y el código de salida.
 
+En los retos no se teclea la entrada: el curso la pasa automáticamente al probar el
+código. Por eso `read -p` no muestra su mensaje durante la corrección (la entrada llega
+por una tubería); en las demos sí se ve, porque hay teclado.
+
 Al superar ciertos niveles se desbloquean mejoras de la interfaz: colores, menú, editor,
 fzf y estadísticas. El script no se modifica a sí mismo: el progreso guardado decide qué
 etapa se muestra.

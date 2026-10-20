@@ -12,7 +12,7 @@
 
 set -uo pipefail
 
-VERSION="0.3.2"
+VERSION="0.3.3"
 DIR_DATOS="${XDG_DATA_HOME:-$HOME/.local/share}/bash4u"
 ARCH_ESTADO="$DIR_DATOS/estado"
 DIR_PRACTICAS="${BASH4U_PRACTICAS:-$HOME/bash4u-practicas}"
@@ -434,7 +434,14 @@ ejecutar_codigo() {
             || (( exit_real != exit_esperado )); then
             local mostrado=${esperado:-"(sin salida)"}
             local obtenido=${salida:-"(sin salida)"}
-            DETALLE_FALLO="Esperaba:
+            local cabecera=""
+            if [[ -n $entrada ]]; then
+                cabecera="Entrada de prueba:
+[${entrada}]
+
+"
+            fi
+            DETALLE_FALLO="${cabecera}Esperaba:
 ${mostrado}
 (código de salida ${exit_esperado})
 
@@ -476,7 +483,8 @@ definir_reto() {
     R_CHEQUEO=""
     R_LOGRO=""
     R_NOTA="CÓMO SE EJECUTA
-El curso ejecuta tu código con bash; no necesitas shebang ni chmod."
+El curso ejecuta tu código con bash; no necesitas shebang ni chmod.
+La entrada de prueba la pone el curso: tú escribes solo el código."
     shift 7
     R_CASOS=("$@")
 }
@@ -1315,6 +1323,11 @@ echo "Frase: $frase"' \
 echo Frase: $frase' \
         '' 5 \
         "  hola   mundo|Frase:   hola   mundo|0"
+    R_NOTA="CÓMO SE EJECUTA
+El curso ejecuta tu código con bash; no necesitas shebang ni chmod.
+La frase de prueba la pone el curso: no la escribas en el editor.
+read -p no muestra el mensaje al corregir porque la entrada llega
+por una tubería; en la demo sí se ve porque hay teclado."
     R_LOGRO="Has conservado los espacios con IFS= read -r."
 }
 
@@ -1459,6 +1472,18 @@ paso_01_demo_read_ifs() {
     demo_01_read_r_ifs
 }
 
+paso_01_como_probar() {
+    pantalla "Nivel 1 · Cómo se prueban los retos" "En un reto no escribes la entrada: escribes tu código y terminas
+con una línea que sea solo #fin.
+
+Después el curso ejecuta tu código y le pasa los datos de prueba
+automáticamente. Compara la salida y el código de salida.
+
+read -p funciona en un script normal, pero en la corrección no se ve
+su mensaje: la entrada llega por una tubería, no por un teclado.
+En las demos sí lo ves porque estás escribiendo tú." "Enter para empezar los retos"
+}
+
 PASOS_01=(
     paso_01_intro
     paso_01_variables
@@ -1471,6 +1496,7 @@ PASOS_01=(
     paso_01_demo_read_p
     paso_01_read_ifs
     paso_01_demo_read_ifs
+    paso_01_como_probar
 )
 
 leccion_01() {
