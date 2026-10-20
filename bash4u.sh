@@ -12,7 +12,7 @@
 
 set -uo pipefail
 
-VERSION="0.2.0"
+VERSION="0.3.0"
 DIR_DATOS="${XDG_DATA_HOME:-$HOME/.local/share}/bash4u"
 ARCH_ESTADO="$DIR_DATOS/estado"
 DIR_PRACTICAS="${BASH4U_PRACTICAS:-$HOME/bash4u-practicas}"
@@ -23,6 +23,7 @@ MODO_RAPIDO=0
 AUTOTEST=0
 CAPS_OVERRIDE=""
 CAPS_OVERRIDE_ACTIVO=0
+FORZAR=0        # con --si no se pide confirmación (útil en scripts)
 
 # ------------------------------------------------------------------ colores ---
 C_RESET=""
@@ -72,6 +73,22 @@ lista_contiene() {
     [[ ",${1:-}," == *",${2},"* ]]
 }
 
+# Divide una lista "a,b,c" en el array global LISTA.
+# Se hace con expansiones de parámetros y no con `read -a <<< ...`: el
+# here-string depende de un fichero temporal y, si ese fichero falla, el
+# array sale vacío en silencio (y con él se pierde el progreso).
+dividir_lista() {
+    LISTA=()
+    local lista=${1:-} elemento
+    [[ -z $lista ]] && return 0
+    while [[ $lista == *,* ]]; do
+        elemento=${lista%%,*}
+        LISTA+=("$elemento")
+        lista=${lista#*,}
+    done
+    LISTA+=("$lista")
+}
+
 agregar_lista() {
     local lista=${1:-} item=$2
     if [[ -z $lista ]]; then
@@ -86,9 +103,8 @@ agregar_lista() {
 quitar_lista() {
     local lista=${1:-} item=$2 salida="" x
     [[ -z $lista ]] && return 0
-    local -a partes=()
-    IFS=',' read -ra partes <<< "$lista"
-    for x in "${partes[@]}"; do
+    dividir_lista "$lista"
+    for x in "${LISTA[@]}"; do
         [[ $x == "$item" ]] && continue
         salida=${salida:+$salida,}$x
     done
@@ -98,9 +114,8 @@ quitar_lista() {
 contar_lista() {
     local lista=${1:-}
     [[ -z $lista ]] && { printf '0'; return 0; }
-    local -a partes=()
-    IFS=',' read -ra partes <<< "$lista"
-    printf '%s' "${#partes[@]}"
+    dividir_lista "$lista"
+    printf '%s' "${#LISTA[@]}"
 }
 
 # ==================================================================== estado ===
@@ -273,7 +288,14 @@ paginar() {
     while [[ $texto == *$'\n' ]]; do texto=${texto%$'\n'}; done
 
     local -a lineas=()
-    mapfile -t lineas <<< "$texto"
+    local resto=$texto
+    # Se parte por saltos de línea con expansiones de parámetros (sin
+    # here-strings: si el fichero temporal falla, el texto se perdería).
+    while [[ $resto == *$'\n'* ]]; do
+        lineas+=("${resto%%$'\n'*}")
+        resto=${resto#*$'\n'}
+    done
+    lineas+=("$resto")
     local total=${#lineas[@]} i=0 por_pagina=18 fin
 
     if [[ $MODO_PLANO -eq 0 && -t 1 ]] && command -v tput >/dev/null 2>&1; then
@@ -1067,7 +1089,7 @@ demo_01() {
 
     printf '%s\n' "→ read -r lee una línea (aquí desde una cadena)"
     local leido
-    read -r leido <<< "Linus"
+    read -r leido <<< "Linus" || leido="Linus"
     printf 'leído: %s\n' "$leido"
 }
 
@@ -1421,7 +1443,10 @@ repaso_adaptativo() {
     fi
 
     local -a ids=()
-    IFS=',' read -ra ids <<< "$EST_PENDIENTES"
+    dividir_lista "$EST_PENDIENTES"
+    if (( ${#LISTA[@]} > 0 )); then
+        ids=("${LISTA[@]}")
+    fi
 
     local id fn hechos=0
     for id in "${ids[@]}"; do
@@ -1546,6 +1571,134 @@ probar_etapas() {
     return 0
 }
 
+probar_resets() {
+    local fallos=0
+    local raiz datos practicas
+    raiz=$(mktemp -d) || return 1
+    datos="$raiz/datos"
+    practicas="$raiz/practicas"
+    mkdir -p "$datos" "$practicas"
+
+    local o_datos=$DIR_DATOS o_arch=$ARCH_ESTADO o_prac=$DIR_PRACTICAS
+    local o_plano=$MODO_PLANO o_forzar=$FORZAR
+
+    DIR_DATOS=$datos
+    ARCH_ESTADO="$datos/estado"
+    DIR_PRACTICAS=$practicas
+    MODO_PLANO=1
+    FORZAR=1
+
+    # Estado de mentira: niveles 0 y 2 superados, un reto pendiente.
+    estado_defecto
+    EST_COMPLETADAS="0,2"
+    EST_RETOS="0.1,0.2,2.1"
+    EST_PENDIENTES="2.2"
+    EST_XP=70
+    EST_DESBLOQUEOS="colores"
+    EST_LECCION=2
+    guardar_estado
+
+    reset_nivel 2 >/dev/null 2>&1
+    cargar_estado
+    if [[ $EST_COMPLETADAS == "0" ]]; then
+        ok "reset de nivel · quita el nivel de «superado»"
+    else
+        mal "reset de nivel · quita el nivel de «superado» ($EST_COMPLETADAS)"
+        fallos=$((fallos + 1))
+    fi
+    if [[ $EST_RETOS == "0.1,0.2" ]]; then
+        ok "reset de nivel · deja los retos de los otros niveles"
+    else
+        mal "reset de nivel · deja los retos de los otros niveles ($EST_RETOS)"
+        fallos=$((fallos + 1))
+    fi
+    if [[ -z $EST_PENDIENTES ]]; then
+        ok "reset de nivel · limpia los pendientes del nivel"
+    else
+        mal "reset de nivel · limpia los pendientes del nivel ($EST_PENDIENTES)"
+        fallos=$((fallos + 1))
+    fi
+    if (( EST_XP == 40 )); then
+        ok "reset de nivel · descuenta el XP del nivel (70 - 30)"
+    else
+        mal "reset de nivel · descuenta el XP del nivel (quedan $EST_XP, esperaba 40)"
+        fallos=$((fallos + 1))
+    fi
+    if [[ $EST_DESBLOQUEOS == "colores" ]]; then
+        ok "reset de nivel · conserva los desbloqueos"
+    else
+        mal "reset de nivel · conserva los desbloqueos ($EST_DESBLOQUEOS)"
+        fallos=$((fallos + 1))
+    fi
+    if [[ $EST_LECCION != "2" ]]; then
+        ok "reset de nivel · suelta el nivel actual"
+    else
+        mal "reset de nivel · suelta el nivel actual"
+        fallos=$((fallos + 1))
+    fi
+
+    estado_defecto
+    cargar_estado
+    if [[ $EST_RETOS == "0.1,0.2" ]] && (( EST_XP == 40 )); then
+        ok "reset de nivel · el cambio queda guardado en disco"
+    else
+        mal "reset de nivel · el cambio queda guardado en disco"
+        fallos=$((fallos + 1))
+    fi
+
+    # Reinicio del progreso: borra el estado y conserva los scripts.
+    printf 'hola\n' > "$practicas/hola.sh"
+    reset_progreso >/dev/null 2>&1
+    if [[ ! -f $ARCH_ESTADO ]]; then
+        ok "reset de progreso · borra el estado"
+    else
+        mal "reset de progreso · borra el estado"
+        fallos=$((fallos + 1))
+    fi
+    if [[ -f $practicas/hola.sh ]]; then
+        ok "reset de progreso · conserva los scripts"
+    else
+        mal "reset de progreso · conserva los scripts"
+        fallos=$((fallos + 1))
+    fi
+
+    # Reinicio total: borra también los scripts.
+    estado_defecto
+    EST_XP=10
+    guardar_estado
+    reset_total >/dev/null 2>&1
+    if [[ ! -f $ARCH_ESTADO ]]; then
+        ok "reset total · borra el estado"
+    else
+        mal "reset total · borra el estado"
+        fallos=$((fallos + 1))
+    fi
+    if [[ ! -f $practicas/hola.sh ]]; then
+        ok "reset total · borra los scripts de prácticas"
+    else
+        mal "reset total · borra los scripts de prácticas"
+        fallos=$((fallos + 1))
+    fi
+    if [[ -d $practicas ]]; then
+        ok "reset total · mantiene la carpeta de prácticas"
+    else
+        mal "reset total · mantiene la carpeta de prácticas"
+        fallos=$((fallos + 1))
+    fi
+
+    # Restaurar el entorno real.
+    DIR_DATOS=$o_datos
+    ARCH_ESTADO=$o_arch
+    DIR_PRACTICAS=$o_prac
+    MODO_PLANO=$o_plano
+    FORZAR=$o_forzar
+    estado_defecto
+    cargar_estado
+    rm -rf "$raiz"
+
+    (( fallos == 0 ))
+}
+
 self_test() {
     local fallos=0 total=0
     printf 'bash4u %s · self-test\n\n' "$VERSION"
@@ -1556,9 +1709,16 @@ self_test() {
     total=$((total + 1))
     if probar_etapas; then ok "etapas 0-5"; else mal "etapas 0-5"; fallos=$((fallos + 1)); fi
 
-    local entrada num titulo fn demo retos_nombre
+    total=$((total + 1))
+    if probar_resets; then ok "reinicios (progreso, nivel y total)"; else mal "reinicios (progreso, nivel y total)"; fallos=$((fallos + 1)); fi
+
+    local entrada num titulo fn demo retos_nombre resto
     for entrada in "${LECCIONES[@]}"; do
-        IFS='|' read -r num titulo fn <<< "$entrada"
+        # Formato "N|título|función": se parte por el primer y el último «|».
+        num=${entrada%%|*}
+        resto=${entrada#*|}
+        fn=${resto##*|}
+        titulo=${resto%|*}
         declare -F "$fn" >/dev/null 2>&1 || continue
         printf '\nNivel %s · %s\n' "$num" "$titulo"
 
@@ -1606,6 +1766,295 @@ self_test() {
     return 1
 }
 
+# ================================================================== resets ====
+#
+# Reiniciar el progreso tiene tres fuerzas distintas:
+#   --reset-progress   borra el estado (tu curso) y conserva tus scripts
+#   --reset-nivel N    pone a cero un solo nivel
+#   --reset-all        borra el estado y los scripts de prácticas
+#
+# Todos explican primero qué van a tocar y después piden confirmación.
+
+# Muestra el estado guardado tal cual: una línea por dato (clave=valor).
+mostrar_estado_actual() {
+    printf '  completadas=%s\n' "$EST_COMPLETADAS"
+    printf '  retos=%s\n' "$EST_RETOS"
+    printf '  pendientes=%s\n' "$EST_PENDIENTES"
+    printf '  xp=%s\n' "$EST_XP"
+    printf '  desbloqueos=%s\n' "$EST_DESBLOQUEOS"
+    printf '  leccion=%s\n' "$EST_LECCION"
+}
+
+# Cuenta en una lista (a,b,c) los elementos que empiezan por un prefijo.
+contar_prefijo() {
+    local lista=${1:-} prefijo=$2 n=0 x
+    [[ -z $lista ]] && { printf '0'; return 0; }
+    dividir_lista "$lista"
+    for x in "${LISTA[@]}"; do
+        [[ $x == "$prefijo"* ]] && n=$((n + 1))
+    done
+    printf '%s' "$n"
+}
+
+# Quita de una lista (a,b,c) los elementos que empiezan por un prefijo.
+quitar_prefijo() {
+    local lista=${1:-} prefijo=$2 salida="" x
+    [[ -z $lista ]] && { printf ''; return 0; }
+    dividir_lista "$lista"
+    for x in "${LISTA[@]}"; do
+        [[ $x == "$prefijo"* ]] && continue
+        salida=${salida:+$salida,}$x
+    done
+    printf '%s' "$salida"
+}
+
+# Cuántos retos declara un nivel (0 si ese nivel todavía no existe).
+retos_de_nivel() {
+    local num=$1 nombre
+    nombre=$(printf 'RETOS_%02d' "$num")
+    if ! declare -p "$nombre" >/dev/null 2>&1; then
+        printf '0'
+        return 0
+    fi
+    local -n retos="$nombre"
+    printf '%s' "${#retos[@]}"
+    unset -n retos
+}
+
+# Lista el contenido de la carpeta de prácticas (para explicarla antes de borrar).
+listado_practicas() {
+    if [[ ! -d $DIR_PRACTICAS ]]; then
+        printf '     (todavía no existe)'
+        return 0
+    fi
+
+    local -a entradas=()
+    local g1 g2
+    g1=$(shopt -p dotglob); g2=$(shopt -p nullglob)
+    shopt -s dotglob nullglob
+    entradas=("$DIR_PRACTICAS"/*)
+    eval "$g1"; eval "$g2"
+
+    if (( ${#entradas[@]} == 0 )); then
+        printf '     (vacía)'
+        return 0
+    fi
+
+    local f
+    for f in "${entradas[@]}"; do
+        printf '     %s\n' "${f##*/}"
+    done
+}
+
+# Borra el contenido de una carpeta (sin borrarla) y dice cuántos eran.
+borrar_contenido() {
+    local dir=$1 n=0
+    [[ -d $dir ]] || { printf '0'; return 0; }
+
+    local -a entradas=()
+    local g1 g2
+    g1=$(shopt -p dotglob); g2=$(shopt -p nullglob)
+    shopt -s dotglob nullglob
+    entradas=("$dir"/*)
+    eval "$g1"; eval "$g2"
+
+    local f
+    for f in "${entradas[@]}"; do
+        rm -rf -- "$f" && n=$((n + 1))
+    done
+    printf '%s' "$n"
+}
+
+# Pregunta antes de hacer algo que no se puede deshacer.
+confirmar_reset() {
+    local pregunta=$1 respuesta=""
+
+    [[ $FORZAR -eq 1 ]] && return 0
+    [[ $AUTOTEST -eq 1 ]] && return 0
+
+    if [[ ! -t 0 ]]; then
+        printf '\n%s\n' "(sin teclado: se ejecuta sin preguntar; añade --si si lo pones en un script)"
+        return 0
+    fi
+
+    printf '\n%s' "${C_PROMPT}${pregunta} ${C_RESET}"
+    if ! IFS= read -r -e respuesta; then
+        printf '\n'
+        return 1
+    fi
+    [[ $respuesta =~ ^[sSyY]$ ]]
+}
+
+# Explicación (con la línea del curso) de lo que va a pasar, antes de hacerlo.
+explicar_reset() {
+    local modo=$1 arg=${2:-}
+    local titulo="" cuerpo="" pie=""
+    local num=$arg total resueltos completado descuento estado_texto fn
+
+    case $modo in
+    progreso)
+        titulo="Reiniciar tu progreso"
+        cuerpo="Tu progreso no vive dentro del curso: vive en un archivo aparte.
+
+  ${ARCH_ESTADO}
+
+Y ahora mismo ese archivo dice:
+
+$(mostrar_estado_actual)
+
+Una línea por dato, con el formato clave=valor.
+
+Tus scripts se guardan en otra carpeta:
+
+  ${DIR_PRACTICAS}
+
+Reiniciar el progreso es borrar ese archivo y nada más. Es como tirar
+la libreta y empezar el temario otra vez: vuelves al nivel 0, con 0 XP
+y sin habilidades desbloqueadas.
+
+El curso no se toca: bash4u.sh sigue exactamente igual."
+        pie="Se borra solo el estado; tus scripts de prácticas se conservan."
+        ;;
+    nivel)
+        num=$arg
+        total=$(retos_de_nivel "$num")
+        resueltos=$(contar_prefijo "$EST_RETOS" "$num.")
+        completado=0
+        lista_contiene "$EST_COMPLETADAS" "$num" && completado=1
+        descuento=$(( completado * 20 + resueltos * 10 ))
+        if (( completado )); then
+            estado_texto="lo tienes superado"
+        else
+            estado_texto="no lo has superado todavía"
+        fi
+
+        titulo="Reiniciar el nivel ${num} · ${TITULOS[$num]}"
+        cuerpo="Vas a poner a cero un solo nivel, sin tocar el resto del curso.
+
+  Nivel ${num}: ${TITULOS[$num]}
+  Retos del nivel: ${total}
+  Resueltos por ti: ${resueltos}
+  Ahora mismo: ${estado_texto}
+
+Al reiniciarlo:
+  · el nivel deja de contar como «superado»
+  · sus retos vuelven a la lista de pendientes: puedes repetirlos y
+    sacar el XP otra vez (10 XP por reto)
+  · se descuentan ${descuento} XP del total (20 por el nivel + 10 por
+    cada reto que habías resuelto)
+  · los demás niveles, tus habilidades desbloqueadas y tus scripts de
+    prácticas se quedan como están
+
+Los 5 XP extra del repaso adaptativo no se tocan: no se puede saber a
+qué nivel pertenecían."
+        pie="Solo afecta al nivel ${num}."
+        ;;
+    total)
+        titulo="Reiniciar todo: progreso y scripts"
+        cuerpo="Vas a borrar las dos cosas: tu progreso y tus scripts.
+
+  1. El estado
+     ${ARCH_ESTADO}
+
+  2. Tus scripts de prácticas
+     ${DIR_PRACTICAS}
+$(listado_practicas)
+
+Esto no se puede deshacer: los archivos se borran de verdad.
+El curso (bash4u.sh) tampoco se toca."
+        pie="Sin marcha atrás: esto es empezar de cero de verdad."
+        ;;
+    *)
+        error "modo de reinicio desconocido: $modo"
+        return 2
+        ;;
+    esac
+
+    pantalla "$titulo" "$cuerpo" "$pie"
+}
+
+# Reinicio del progreso: borra el estado y conserva los scripts.
+reset_progreso() {
+    explicar_reset progreso
+
+    if ! confirmar_reset "¿Borrar tu progreso y empezar de cero? (s/N)"; then
+        printf '\n%s\n' "Cancelado: no se ha tocado nada."
+        return 1
+    fi
+
+    rm -f "$ARCH_ESTADO"
+    printf '\n%s\n' "Progreso borrado. Empiezas de cero: nivel 0, 0 XP."
+    return 0
+}
+
+# Reinicio de un nivel: pone a cero ese nivel y nada más.
+reset_nivel() {
+    local num=$1
+
+    if [[ ! $num =~ ^([0-9]|1[0-2])$ ]]; then
+        error "Nivel inválido: $num (usa 0-12)"
+        return 2
+    fi
+
+    local fn
+    fn=$(funcion_leccion "$num")
+    if ! declare -F "$fn" >/dev/null 2>&1; then
+        printf '%s\n' "Aviso: el nivel $num todavía no está implementado; el reinicio no tendrá efecto."
+    fi
+
+    explicar_reset nivel "$num"
+
+    if ! confirmar_reset "¿Reiniciar el nivel ${num}? (s/N)"; then
+        printf '\n%s\n' "Cancelado: no se ha tocado nada."
+        return 1
+    fi
+
+    local resueltos completado descuento
+    resueltos=$(contar_prefijo "$EST_RETOS" "$num.")
+    completado=0
+    lista_contiene "$EST_COMPLETADAS" "$num" && completado=1
+    descuento=$(( completado * 20 + resueltos * 10 ))
+
+    EST_COMPLETADAS=$(quitar_lista "$EST_COMPLETADAS" "$num")
+    EST_RETOS=$(quitar_prefijo "$EST_RETOS" "$num.")
+    EST_PENDIENTES=$(quitar_prefijo "$EST_PENDIENTES" "$num.")
+    if [[ $EST_LECCION == "$num" ]]; then
+        EST_LECCION=""
+    fi
+    EST_XP=$((EST_XP - descuento))
+    (( EST_XP < 0 )) && EST_XP=0
+    guardar_estado
+
+    printf '\n%s\n' "Nivel ${num} reiniciado."
+    printf '  · %s retos vuelven a empezar\n' "$resueltos"
+    printf '  · %s XP descontados (quedan %s XP · %s)\n' "$descuento" "$EST_XP" "$(rango_actual)"
+    return 0
+}
+
+# Reinicio total: borra el estado y los scripts de prácticas.
+reset_total() {
+    if [[ -z $DIR_PRACTICAS || $DIR_PRACTICAS == "/" || $DIR_PRACTICAS == "$HOME" ]]; then
+        error "directorio de prácticas no seguro: ${DIR_PRACTICAS}"
+        return 2
+    fi
+
+    explicar_reset total
+
+    if ! confirmar_reset "¿Borrar el progreso y tus scripts de prácticas? (s/N)"; then
+        printf '\n%s\n' "Cancelado: no se ha tocado nada."
+        return 1
+    fi
+
+    rm -f "$ARCH_ESTADO"
+    local borrados
+    borrados=$(borrar_contenido "$DIR_PRACTICAS")
+
+    printf '\n%s\n' "Todo borrado: progreso y scripts de prácticas."
+    printf '  · %s archivos eliminados de %s\n' "$borrados" "$DIR_PRACTICAS"
+    printf '  · empiezas de cero: nivel 0, 0 XP\n'
+    return 0
+}
+
 # ==================================================================== CLI =====
 
 mostrar_lista() {
@@ -1651,10 +2100,19 @@ Uso:
   bash bash4u.sh --solucion N    ver las soluciones de un nivel
   bash bash4u.sh --self-test     verificar el propio curso
   bash bash4u.sh --stage N       previsualizar una etapa (0-5)
-  bash bash4u.sh --reset-progress borrar el progreso
+  bash bash4u.sh --reset-progress borrar el progreso (conserva tus scripts)
+  bash bash4u.sh --reset-nivel N reiniciar un solo nivel
+  bash bash4u.sh --reset-all     borrar el progreso y los scripts de prácticas
   bash bash4u.sh --plano         sin colores ni pantalla completa
   bash bash4u.sh --rapido        sin animaciones
+  bash bash4u.sh --si            no pedir confirmación (para scripts)
   bash bash4u.sh --help          esta ayuda
+
+Reinicios:
+  --reset-progress  borra el estado y empieza de cero; tus scripts se quedan
+  --reset-nivel N   pone a cero el nivel N (retos, XP y estado de «superado»)
+  --reset-all       borra además los scripts de la carpeta de prácticas
+  Todos explican antes qué van a borrar y piden confirmación.
 
 Progreso: ${ARCH_ESTADO}
 Prácticas: ${DIR_PRACTICAS}
@@ -1674,6 +2132,12 @@ main() {
                 accion=selftest; shift ;;
             --reset|--reset-progress)
                 accion=reset; shift ;;
+            --reset-nivel|--reset-level)
+                accion=reset_nivel; arg=${2:-}; shift 2 || shift ;;
+            --reset-all|--reset-todo)
+                accion=reset_all; shift ;;
+            --si|--force|-f|-y)
+                FORZAR=1; shift ;;
             --stage)
                 accion=stage; arg=${2:-}; shift 2 || shift ;;
             --solucion|--solution)
@@ -1693,14 +2157,15 @@ main() {
         esac
     done
 
-    if [[ $accion == reset ]]; then
-        rm -f "$ARCH_ESTADO"
-        printf '%s\n' "Progreso borrado."
-        return 0
-    fi
-
     mkdir -p "$DIR_DATOS" "$DIR_PRACTICAS" 2>/dev/null
     cargar_estado
+    configurar_colores
+
+    case $accion in
+        reset)       reset_progreso; return $? ;;
+        reset_nivel) reset_nivel "$arg"; return $? ;;
+        reset_all)   reset_total; return $? ;;
+    esac
 
     if [[ $accion == stage ]]; then
         if [[ ! $arg =~ ^[0-5]$ ]]; then
@@ -1709,9 +2174,8 @@ main() {
         fi
         CAPS_OVERRIDE=$(caps_etapa "$arg")
         CAPS_OVERRIDE_ACTIVO=1
+        configurar_colores
     fi
-
-    configurar_colores
 
     case $accion in
         selftest) self_test; return $? ;;
