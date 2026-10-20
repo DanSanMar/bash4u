@@ -12,7 +12,7 @@
 
 set -uo pipefail
 
-VERSION="0.3.1"
+VERSION="0.3.2"
 DIR_DATOS="${XDG_DATA_HOME:-$HOME/.local/share}/bash4u"
 ARCH_ESTADO="$DIR_DATOS/estado"
 DIR_PRACTICAS="${BASH4U_PRACTICAS:-$HOME/bash4u-practicas}"
@@ -475,6 +475,8 @@ definir_reto() {
     R_ARCHIVO=""
     R_CHEQUEO=""
     R_LOGRO=""
+    R_NOTA="CÓMO SE EJECUTA
+El curso ejecuta tu código con bash; no necesitas shebang ni chmod."
     shift 7
     R_CASOS=("$@")
 }
@@ -491,6 +493,8 @@ bucle_reto() {
     while (( intentos < max )); do
         lineas=()
         pantalla "$titulo" "${R_ENUNCIADO}
+
+${R_NOTA}
 
 Escribe tu solución, una línea por vez.
 Cuando termines, escribe una línea con solo:   #fin/# fin 
@@ -854,18 +858,19 @@ demo_00() {
 reto_00_1() {
     definir_reto \
         "0.1" \
-        "Vas a escribir el contenido de tu primer script.
-
-El curso lo guardará como hola.sh y lo ejecutará con bash.
+        "OBJETIVO
+Escribe el contenido de tu primer script, hola.sh, que salude.
 Un archivo .sh es, por convención, un script de shell: texto con
 órdenes de bash.
 
-Debe imprimir exactamente:
-Hola, bash" \
+SALIDA ESPERADA
+Hola, bash
+
+El shebang es parte del ejercicio: la primera línea debe ser
+#!/bin/bash. No tienes que crear el archivo a mano." \
         "Escribe dos líneas:
   #!/bin/bash
-  echo \"Hola, bash\"
-No tienes que crear el archivo: escribe solo su contenido." \
+  echo \"Hola, bash\"" \
         '#!/bin/bash
 echo "Hola, bash"' \
         '#!/bin/bash
@@ -873,40 +878,44 @@ echo "Adiós"' \
         '' 5 \
         "|Hola, bash|0"
     R_ARCHIVO="hola.sh"
+    R_NOTA="CÓMO SE EJECUTA
+El curso guarda tu texto como hola.sh y lo ejecuta con bash.
+No hace falta chmod +x."
     R_LOGRO="Has escrito un script con shebang y lo has ejecutado con bash."
 }
 
 reto_00_2() {
     definir_reto \
         "0.2" \
-        "Escribe un script llamado comillas.sh que imprima exactamente
+        "OBJETIVO
+Escribe el contenido de comillas.sh para que imprima exactamente
 esta línea, con TRES espacios entre «Hola,» y «mundo»:
 
 Hola,   mundo
      ^^^ tres espacios, no uno
 
-Usa comillas dobles alrededor del texto (las simples también
-conservarían los espacios; en la solución usamos dobles).
-La salida no lleva comillas: las comillas solo agrupan el texto
-y no se imprimen. El curso guardará el archivo y lo ejecutará con bash." \
+Usa comillas dobles alrededor del texto. Las comillas no se imprimen:
+solo agrupan el texto para que bash conserve los espacios." \
         "echo \"Hola,   mundo\"
 Las comillas dobles conservan los espacios. Sin comillas, bash separa
 el texto por espacios y los convierte en uno solo.
 La salida debe ser Hola,   mundo (sin comillas alrededor)." \
-        '#!/bin/bash
-echo "Hola,   mundo"' \
-        '#!/bin/bash
-echo Hola,   mundo' \
+        'echo "Hola,   mundo"' \
+        'echo Hola,   mundo' \
         '' 5 \
         "|Hola,   mundo|0"
     R_ARCHIVO="comillas.sh"
+    R_NOTA="CÓMO SE EJECUTA
+El curso guarda tu texto como comillas.sh y lo ejecuta con bash.
+No necesitas shebang ni chmod; aquí lo importante es la línea de echo."
     R_LOGRO="Has usado comillas para conservar los espacios."
 }
 
 reto_00_3() {
     definir_reto \
         "0.3" \
-        "Crea un archivo llamado saludo.txt en el directorio actual.
+        "OBJETIVO
+Crea un archivo llamado saludo.txt en el directorio actual.
 Su contenido debe ser exactamente esta línea:
 
 Hola, bash
@@ -920,6 +929,9 @@ El símbolo > escribe la salida en un archivo en vez de en la pantalla." \
         '' 5 \
         "||0"
     R_CHEQUEO='[[ -f saludo.txt ]] && [[ "$(cat saludo.txt)" == "Hola, bash" ]]'
+    R_NOTA="CÓMO SE EJECUTA
+El curso ejecuta tu código con bash; no necesitas shebang ni chmod.
+Después comprueba que saludo.txt existe y contiene el texto."
     R_LOGRO="Has usado > para crear saludo.txt con el texto dentro."
 }
 
@@ -1159,8 +1171,8 @@ demo_01_aritmetica() {
     echo "edad en 2026: $edad"
 }
 
-demo_01_read() {
-    local nombre ciudad ruta frase interactivo=0
+demo_01_read_basico() {
+    local nombre interactivo=0
 
     [[ $AUTOTEST -eq 0 && -t 0 ]] && interactivo=1
 
@@ -1175,7 +1187,18 @@ demo_01_read() {
     echo "Hola, $nombre"
 
     echo
-    echo "→ read -p: el mensaje y la lectura van en la misma orden"
+    echo "Así se usa read en un script:"
+    echo '  echo "Escribe tu nombre:"'
+    echo '  read -r nombre'
+    echo '  echo "Hola, $nombre"'
+}
+
+demo_01_read_p() {
+    local ciudad interactivo=0
+
+    [[ $AUTOTEST -eq 0 && -t 0 ]] && interactivo=1
+
+    echo "→ read -p: mensaje y lectura en la misma orden"
     if (( interactivo )); then
         read -r -e -p "Escribe tu ciudad: " ciudad || ciudad=""
     else
@@ -1185,6 +1208,16 @@ demo_01_read() {
     echo "ciudad: $ciudad"
 
     echo
+    echo "Forma habitual en un script:"
+    echo '  read -r -p "Escribe tu ciudad: " ciudad'
+    echo '  echo "ciudad: $ciudad"'
+}
+
+demo_01_read_r_ifs() {
+    local ruta frase interactivo=0
+
+    [[ $AUTOTEST -eq 0 && -t 0 ]] && interactivo=1
+
     echo "→ -r evita que se coman las barras invertidas"
     echo 'C:\Users\arch' | {
         read ruta
@@ -1205,30 +1238,41 @@ demo_01_read() {
         IFS= read -r frase
         echo "IFS= read:  [$frase]"
     }
+
+    if (( interactivo )); then
+        echo
+        echo "Prueba tú: escribe una frase con espacios al principio o al final."
+        IFS= read -r -e -p "Frase: " frase || frase=""
+        echo "frase: [$frase]"
+    fi
 }
 
-# El self-test ejecuta demo_01; el nivel 1 llama a las tres partes por separado.
+# El self-test ejecuta demo_01; el nivel 1 llama a cada demo por separado.
 demo_01() {
     demo_01_variables
     demo_01_aritmetica
-    demo_01_read
+    demo_01_read_basico
+    demo_01_read_p
+    demo_01_read_r_ifs
 }
 
 reto_01_1() {
     definir_reto \
         "1.1" \
-        "Lee dos números, uno por línea, y calcula su suma y su producto.
+        "OBJETIVO
+Pide dos números y muestra su suma y su producto.
+Es el uso habitual de read: preguntar, leer y responder.
 
-Imprime exactamente:
+ENTRADA: dos números, uno por línea.
+SALIDA ESPERADA:
 suma: N
 producto: M
+EJEMPLO: 3 y 4 → suma: 7 · producto: 12
 
-Ejemplo: si la entrada es 3 y 4, la salida debe ser:
-suma: 7
-producto: 12" \
-        "read -r a y read -r b; después \$((a + b)) y \$((a * b))." \
-        'read -r a
-read -r b
+Puedes usar read -r -p; su mensaje no cuenta como salida." \
+        "Lee cada número con read -r o read -r -p y calcula con \$(( ))." \
+        'read -r -p "Primer número: " a
+read -r -p "Segundo número: " b
 echo "suma: $((a + b))"
 echo "producto: $((a * b))"' \
         'read -r a
@@ -1245,24 +1289,33 @@ producto: 0|0" \
         "-2
 3|suma: 1
 producto: -6|0"
+    R_LOGRO="Has leído dos números con read y has calculado con \$(( ))."
 }
 
 reto_01_2() {
     definir_reto \
         "1.2" \
-        "Lee una frase que puede tener espacios al principio y varios espacios
-seguidos. Imprime exactamente:
-Frase: <frase>
+        "OBJETIVO
+Lee una frase completa y conserva sus espacios.
+Es lo que harías para leer una dirección o un comentario.
 
-Conserva los espacios tal cual. Ejemplo: si la entrada es
-«  hola   mundo», la salida debe ser «Frase:   hola   mundo»." \
-        "Usa IFS= read -r frase y rodea \$frase con comillas dobles." \
-        'IFS= read -r frase
+ENTRADA: una frase con espacios al principio, al final o en medio.
+SALIDA ESPERADA:
+Frase: <frase>
+EJEMPLO:
+  entrada: «  hola   mundo»
+  salida:  «Frase:   hola   mundo»
+
+Usa IFS= read -r -p \"Frase: \" frase: el IFS vacío evita que read
+recorte los espacios de los extremos." \
+        "Usa IFS= read -r -p \"Frase: \" frase y rodea \$frase con comillas dobles." \
+        'IFS= read -r -p "Frase: " frase
 echo "Frase: $frase"' \
         'read frase
 echo Frase: $frase' \
         '' 5 \
         "  hola   mundo|Frase:   hola   mundo|0"
+    R_LOGRO="Has conservado los espacios con IFS= read -r."
 }
 
 RETOS_01=(reto_01_1 reto_01_2)
@@ -1330,7 +1383,7 @@ paso_01_demo_aritmetica() {
     demo_01_aritmetica
 }
 
-paso_01_read() {
+paso_01_read_basico() {
     pantalla "Nivel 1 · Parte 3" "Leer datos con read" ""
     paginar "$(cat <<'TEXTO'
 read lee una línea de la entrada y la guarda en una variable.
@@ -1346,20 +1399,49 @@ En pantalla:
   Ada
   Hola, Ada
 
+En un script normal, read sin -p se usa después de un echo.
+TEXTO
+)"
+}
+
+paso_01_demo_read_basico() {
+    pantalla "Nivel 1 · Demo de read" "Vamos a pedirte el nombre con read normal." ""
+    demo_01_read_basico
+}
+
+paso_01_read_p() {
+    pantalla "Nivel 1 · Parte 3" "read -p y -r" ""
+    paginar "$(cat <<'TEXTO'
 read -p muestra el mensaje y lee en la misma orden:
   read -r -p "¿Cómo te llamas? " nombre
   echo "Hola, $nombre"
 
 El espacio final del mensaje separa el texto de lo que escribes.
+Esta es la forma más habitual dentro de un script.
 
 -r significa «raw»: no interpreta las barras invertidas.
   read -r ruta     guarda C:\Users\arch tal cual
   read ruta        se come las barras: C:Usersarch
 Usa -r casi siempre.
 
+En un reto no hace falta -p: la entrada ya llega por la tubería.
+TEXTO
+)"
+}
+
+paso_01_demo_read_p() {
+    pantalla "Nivel 1 · Demo de read -p" "Ahora el mensaje va dentro de read." ""
+    demo_01_read_p
+}
+
+paso_01_read_ifs() {
+    pantalla "Nivel 1 · Parte 3" "IFS y espacios" ""
+    paginar "$(cat <<'TEXTO'
 IFS contiene los separadores que usa read: espacio, tabulador y salto
-de línea. Por eso read recorta los espacios de los extremos. Para copiar
-la línea entera, incluidos esos espacios, vacía IFS solo para esa orden:
+de línea. Por eso read recorta los espacios de los extremos.
+
+Para copiar la línea entera, incluidos esos espacios, vacía IFS solo
+para esa orden:
   IFS= read -r frase
   echo "[$frase]"
 
@@ -1368,16 +1450,13 @@ Con la entrada «  hola   mundo  »:
   IFS= read -r frase   → [  hola   mundo  ]
 
 El IFS= de delante solo afecta a esa orden; no cambia IFS para siempre.
-
-En un script normal, read sin -p se usa después de un echo.
-En un reto no hace falta -p: la entrada ya llega por la tubería.
 TEXTO
 )"
 }
 
-paso_01_demo_read() {
-    pantalla "Nivel 1 · Demo de read" "Vamos a probarlo contigo. Después verás -r e IFS=." ""
-    demo_01_read
+paso_01_demo_read_ifs() {
+    pantalla "Nivel 1 · Demo de -r e IFS=" "Mira las barras y los espacios. Al final puedes probar una frase." ""
+    demo_01_read_r_ifs
 }
 
 PASOS_01=(
@@ -1386,8 +1465,12 @@ PASOS_01=(
     paso_01_demo_variables
     paso_01_aritmetica
     paso_01_demo_aritmetica
-    paso_01_read
-    paso_01_demo_read
+    paso_01_read_basico
+    paso_01_demo_read_basico
+    paso_01_read_p
+    paso_01_demo_read_p
+    paso_01_read_ifs
+    paso_01_demo_read_ifs
 )
 
 leccion_01() {
@@ -1427,15 +1510,23 @@ demo_02() {
 reto_02_1() {
     definir_reto \
         "2.1" \
-        "Lee un número por la entrada estándar.
+        "OBJETIVO
+Lee un número y clasifícalo.
 
-Si está entre 1 y 10 (incluidos), imprime exactamente:
+ENTRADA
+Un número por la entrada estándar.
+
+SALIDA ESPERADA
+Si está entre 1 y 10 (incluidos):
   ok
-y termina con código 0.
-
-En cualquier otro caso (mayor, cero, negativo o no numérico), imprime exactamente:
+En cualquier otro caso:
   fuera de rango
-y termina con código 1." \
+
+CÓDIGO DE SALIDA
+0 si está dentro del rango; 1 si está fuera.
+
+Un valor no numérico (por ejemplo, abc), el cero y los negativos
+también cuentan como fuera de rango." \
         "Usa read -r para leer, [[ \$n =~ ^[0-9]+\$ ]] o (( )) para comprobar, y exit 1 en la rama de error." \
         'read -r n
 if [[ $n =~ ^[0-9]+$ ]] && (( n >= 1 && n <= 10 )); then
@@ -1451,6 +1542,7 @@ echo ok' \
         "42|fuera de rango|1" \
         "abc|fuera de rango|1" \
         "0|fuera de rango|1"
+    R_LOGRO="Has leído un número, lo has comprobado y has devuelto el código correcto."
 }
 
 RETOS_02=(reto_02_1)
@@ -1554,7 +1646,16 @@ EOF
 reto_04_1() {
     definir_reto \
         "4.1" \
-        "Imprime los números del 1 al 5, uno por línea, en orden ascendente." \
+        "OBJETIVO
+Repite una acción con un bucle for.
+Imprime los números del 1 al 5, uno por línea, en orden ascendente.
+
+SALIDA ESPERADA
+1
+2
+3
+4
+5" \
         "Un for con {1..5} y echo dentro del bucle." \
         'for i in {1..5}; do
   echo "$i"
@@ -1566,14 +1667,17 @@ done' \
 3
 4
 5|0"
+    R_LOGRO="Has recorrido un rango con for."
 }
 
 reto_04_2() {
     definir_reto \
         "4.2" \
-        "Escribe un menú que se repita hasta que se elija la opción 3.
+        "OBJETIVO
+Escribe un menú que se repita hasta que se elija la opción 3.
+Es la forma habitual de usar read dentro de un bucle.
 
-Debe imprimir estas tres líneas al principio de cada vuelta:
+En cada vuelta debe imprimir:
 1) saludar
 2) despedir
 3) salir
@@ -1632,6 +1736,7 @@ opcion invalida
 2) despedir
 3) salir
 fin|0"
+    R_LOGRO="Has usado read dentro de un bucle para construir un menú."
 }
 
 RETOS_04=(reto_04_1 reto_04_2)
