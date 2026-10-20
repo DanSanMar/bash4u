@@ -12,7 +12,7 @@
 
 set -uo pipefail
 
-VERSION="0.1.0"
+VERSION="0.1.1"
 DIR_DATOS="${XDG_DATA_HOME:-$HOME/.local/share}/bash4u"
 ARCH_ESTADO="$DIR_DATOS/estado"
 DIR_PRACTICAS="${BASH4U_PRACTICAS:-$HOME/bash4u-practicas}"
