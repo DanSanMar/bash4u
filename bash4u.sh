@@ -12,7 +12,7 @@
 
 set -uo pipefail
 
-VERSION="0.3.3"
+VERSION="0.3.4"
 DIR_DATOS="${XDG_DATA_HOME:-$HOME/.local/share}/bash4u"
 ARCH_ESTADO="$DIR_DATOS/estado"
 DIR_PRACTICAS="${BASH4U_PRACTICAS:-$HOME/bash4u-practicas}"
@@ -504,9 +504,8 @@ bucle_reto() {
 
 ${R_NOTA}
 
-Escribe tu solución, una línea por vez.
-Cuando termines, escribe una línea con solo:   #fin/# fin 
-Si te atascas: :pista   ·   Ver tu código: :ver   ·   Empezar de nuevo: :borrar"
+Escribe tu solución, una línea por vez y termina con #fin.
+Ayuda: :pista  ·  :ver  ·  :borrar  ·  :cancelar"
 
         while true; do
             printf '%s' "${C_PROMPT}> ${C_RESET}"
@@ -1222,7 +1221,7 @@ demo_01_read_p() {
 }
 
 demo_01_read_r_ifs() {
-    local ruta frase interactivo=0
+    local ruta texto interactivo=0
 
     [[ $AUTOTEST -eq 0 && -t 0 ]] && interactivo=1
 
@@ -1239,19 +1238,19 @@ demo_01_read_r_ifs() {
     echo
     echo "→ IFS= read -r copia la línea entera, con sus espacios"
     echo '  hola   mundo  ' | {
-        read frase
-        echo "read:       [$frase]"
+        read texto
+        echo "read:       [$texto]"
     }
     echo '  hola   mundo  ' | {
-        IFS= read -r frase
-        echo "IFS= read:  [$frase]"
+        IFS= read -r texto
+        echo "IFS= read:  [$texto]"
     }
 
     if (( interactivo )); then
         echo
         echo "Prueba tú: escribe una frase con espacios al principio o al final."
-        IFS= read -r -e -p "Frase: " frase || frase=""
-        echo "frase: [$frase]"
+        IFS= read -r -e -p "Escribe una frase: " texto || texto=""
+        echo "texto: [$texto]"
     fi
 }
 
@@ -1268,17 +1267,21 @@ reto_01_1() {
     definir_reto \
         "1.1" \
         "OBJETIVO
-Pide dos números y muestra su suma y su producto.
+Pide dos números, léelos con read y muestra su suma y su producto.
 Es el uso habitual de read: preguntar, leer y responder.
 
-ENTRADA: dos números, uno por línea.
-SALIDA ESPERADA:
-suma: N
-producto: M
-EJEMPLO: 3 y 4 → suma: 7 · producto: 12
+CÓMO
+- Dos lecturas con read -r -p: la primera línea se guarda en a
+  y la segunda en b.
+  read -r -p \"Primer número: \" a
+- Suma: \$((a + b)). Producto: \$((a * b)).
+- Imprime exactamente:
+  suma: <resultado>
+  producto: <resultado>
 
-Puedes usar read -r -p; su mensaje no cuenta como salida." \
-        "Lee cada número con read -r o read -r -p y calcula con \$(( ))." \
+EJEMPLO: 3 y 4 → a=3, b=4 → suma: 7 · producto: 12
+Los mensajes de -p no forman parte de la salida." \
+        "Lee cada número con read -r -p y calcula con \$(( ))." \
         'read -r -p "Primer número: " a
 read -r -p "Segundo número: " b
 echo "suma: $((a + b))"
@@ -1304,31 +1307,35 @@ reto_01_2() {
     definir_reto \
         "1.2" \
         "OBJETIVO
-Lee una frase completa y conserva sus espacios.
-Es lo que harías para leer una dirección o un comentario.
+Lee una línea completa sin perder los espacios de los extremos.
 
-ENTRADA: una frase con espacios al principio, al final o en medio.
-SALIDA ESPERADA:
-Frase: <frase>
-EJEMPLO:
-  entrada: «  hola   mundo»
-  salida:  «Frase:   hola   mundo»
+CÓMO
+1. IFS= read -r -p \"Escribe una frase: \" texto
+2. echo \"Frase: \$texto\"
 
-Usa IFS= read -r -p \"Frase: \" frase: el IFS vacío evita que read
-recorte los espacios de los extremos." \
-        "Usa IFS= read -r -p \"Frase: \" frase y rodea \$frase con comillas dobles." \
-        'IFS= read -r -p "Frase: " frase
-echo "Frase: $frase"' \
-        'read frase
-echo Frase: $frase' \
+No confundas:
+  \"Escribe una frase: \"  → mensaje al pedir la línea
+  texto                  → variable con lo leído
+  \"Frase: \$texto\"        → línea que se corrige
+
+La variable se llama texto; Frase: es solo la etiqueta de la salida.
+
+ENTRADA: «  hola   mundo»
+SALIDA:  «Frase:   hola   mundo»
+
+El IFS= vacío conserva los espacios de los extremos." \
+        "Usa IFS= read -r -p \"Escribe una frase: \" texto y luego echo \"Frase: \$texto\".
+La variable texto guarda la línea; Frase: es solo la etiqueta." \
+        'IFS= read -r -p "Escribe una frase: " texto
+echo "Frase: $texto"' \
+        'read texto
+echo "Frase: $texto"' \
         '' 5 \
         "  hola   mundo|Frase:   hola   mundo|0"
     R_NOTA="CÓMO SE EJECUTA
-El curso ejecuta tu código con bash; no necesitas shebang ni chmod.
-La frase de prueba la pone el curso: no la escribas en el editor.
-read -p no muestra el mensaje al corregir porque la entrada llega
-por una tubería; en la demo sí se ve porque hay teclado."
-    R_LOGRO="Has conservado los espacios con IFS= read -r."
+No necesitas shebang. La frase la pone el curso: no la escribas.
+read -p no muestra el mensaje al corregir: la entrada llega por tubería."
+    R_LOGRO="Has conservado los espacios con IFS= read -r y la variable texto."
 }
 
 RETOS_01=(reto_01_1 reto_01_2)
@@ -1455,12 +1462,12 @@ de línea. Por eso read recorta los espacios de los extremos.
 
 Para copiar la línea entera, incluidos esos espacios, vacía IFS solo
 para esa orden:
-  IFS= read -r frase
-  echo "[$frase]"
+  IFS= read -r texto
+  echo "[$texto]"
 
 Con la entrada «  hola   mundo  »:
-  read frase           → [hola   mundo]
-  IFS= read -r frase   → [  hola   mundo  ]
+  read texto           → [hola   mundo]
+  IFS= read -r texto   → [  hola   mundo  ]
 
 El IFS= de delante solo afecta a esa orden; no cambia IFS para siempre.
 TEXTO
