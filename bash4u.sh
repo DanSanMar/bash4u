@@ -438,7 +438,7 @@ bucle_reto() {
         pantalla "$titulo" "${R_ENUNCIADO}
 
 Escribe tu solución, una línea por vez.
-Cuando termines, escribe una línea con solo:   # fin
+Cuando termines, escribe una línea con solo:   #fin/# fin 
 Si te atascas: :pista   ·   Ver tu código: :ver   ·   Empezar de nuevo: :borrar"
 
         while true; do
@@ -915,77 +915,35 @@ TEXTO
 
     pantalla "Nivel 0 · Parte 3" "Comillas y argumentos" ""
     paginar "$(cat <<'TEXTO'
-Las comillas no se imprimen: son instrucciones para bash.
-Sirven para decidir dónde empieza y dónde termina un argumento.
-Un argumento es cada trozo de texto que recibe un comando.
+Las comillas agrupan el texto en un solo argumento y no se imprimen.
+Sin comillas, bash parte la línea por los espacios:
 
-Cuando escribes sin comillas:
-  echo Hola,   mundo
-bash parte la línea por los espacios. Ve dos argumentos:
-  1) Hola,
-  2) mundo
-Después echo los imprime separados por un solo espacio:
-  Hola, mundo
+  echo Hola,   mundo     → Hola, mundo
+  echo "Hola,   mundo"   → Hola,   mundo
+  echo 'Hola,   mundo'   → Hola,   mundo
 
 No es echo quien borra los espacios: bash ya los usó como separadores
-antes de ejecutar echo. echo solo recibe dos palabras y las junta.
+antes de ejecutarlo. Con comillas, el texto llega entero.
 
-Con comillas dobles:
-  echo "Hola,   mundo"
-bash ve UN solo argumento que contiene los tres espacios.
-echo lo imprime tal cual:
-  Hola,   mundo
+  "..."  comillas dobles: conservan espacios y expanden $variables
+  '...'  comillas simples: conservan espacios y todo es literal
 
-Con comillas simples pasa lo mismo con los espacios:
-  echo 'Hola,   mundo'
-  Hola,   mundo
+  echo "Vivo en $HOME"   → Vivo en /home/arch
+  echo 'Vivo en $HOME'   → Vivo en $HOME
 
-Entonces, ¿cuál usar?
-  "..."  comillas dobles: agrupan y permiten expandir $variables
-  '...'  comillas simples: agrupan y todo queda literal
-
-Ejemplo con $HOME, una variable del sistema que guarda tu carpeta
-personal (las variables se explican en el nivel 1; aquí solo mira
-la diferencia):
-  echo "Vivo en $HOME"    → Vivo en /home/arch
-  echo 'Vivo en $HOME'    → Vivo en $HOME
-
-Lo mismo vale para nombres de archivo con espacios:
-  cd Mis documentos       → cd recibe dos argumentos y falla
-  cd "Mis documentos"     → cd recibe uno solo
-
-Para que cuentes los espacios, aquí ␣ representa un espacio:
-  echo "Hola,   mundo"    → Hola,␣␣␣mundo
-  echo Hola,   mundo      → Hola,␣mundo
-
-La barra invertida \ escapa caracteres especiales dentro de comillas
-dobles:
-  \"   imprime una comilla doble
-  \$   imprime un dólar literal, sin expandir una variable
-Por ejemplo:
+La barra invertida \ escapa un carácter especial dentro de comillas
+dobles: \" imprime una comilla y \$ un dólar literal.
   echo "Él dijo \"hola\""  → Él dijo "hola"
   echo "Cuesta \$5"        → Cuesta $5
-  echo 'Cuesta $5'         → Cuesta $5
 Dentro de comillas simples no hace falta escapar: todo es literal.
 
 Las comillas tampoco forman parte de la salida:
-  echo "Hola"       → Hola
-  echo '"Hola"'     → "Hola"
-  echo "'Hola'"     → 'Hola'
+  echo "Hola"     → Hola
+  echo '"Hola"'   → "Hola"
 
-Resumen para un texto con espacios:
-                    ¿un argumento?  ¿conserva espacios?  ¿expande $HOME?
-  sin comillas      no              no                   sí
-  "..."             sí              sí                   sí
-  '...'             sí              sí                   no
-
-Importante: usa comillas rectas ' y ", no las curvas “ ” o ‘ ’.
-Las comillas van alrededor de todo el texto, no de cada palabra.
-
-Regla práctica:
-  - Si el texto lleva espacios, ponlo entre comillas.
-  - Usa comillas dobles por defecto.
-  - Usa comillas simples si quieres que $ y \ sean literales.
+Regla práctica: si el texto lleva espacios, ponlo entre comillas.
+Usa dobles por defecto; simples si quieres que $ y \ sean literales.
+Usa comillas rectas ' y ", no las curvas “ ”.
 TEXTO
 )" || return 1
     pausa || return 1
