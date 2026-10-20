@@ -833,11 +833,10 @@ Hola, bash
 
 Usa una redirección > para enviar el texto al archivo.
 No imprimas nada por pantalla: el texto debe quedar dentro." \
-        "printf '%s\\n' \"Hola, bash\" > saludo.txt
-También vale: echo \"Hola, bash\" > saludo.txt
+        "echo \"Hola, bash\" > saludo.txt
 El símbolo > escribe la salida en un archivo en vez de en la pantalla." \
-        'printf "%s\n" "Hola, bash" > saludo.txt' \
-        'printf "%s\n" "Hola, bash" > saludo.txt.bak' \
+        'echo "Hola, bash" > saludo.txt' \
+        'echo "Hola, bash" > saludo.txt.bak' \
         '' 5 \
         "||0"
     R_CHEQUEO='[[ -f saludo.txt ]] && [[ "$(cat saludo.txt)" == "Hola, bash" ]]'
@@ -908,7 +907,6 @@ sepáis qué esperar. Por eso:
 
 Crear texto en pantalla:
   echo "Hola"             imprime Hola y un salto de línea
-  printf '%s\n' "Hola"    imprime con formato; más predecible
 TEXTO
 )" || return 1
     pausa || return 1
@@ -1029,26 +1027,67 @@ Los tienes guardados en el repaso adaptativo." "Enter para volver"
 
 # ------------------------------------------------------------ nivel 1 --------
 
+demo_01_variables() {
+    local nombre="Ada"
+
+    echo "→ asignación: sin espacios alrededor del ="
+    echo "nombre=$nombre"
+
+    echo "→ las comillas dobles expanden; las simples no"
+    echo "dobles: hola $nombre"
+    echo 'simples: hola $nombre'
+
+    echo "→ las llaves separan el nombre del texto"
+    echo "${nombre}ismo"
+}
+
+demo_01_aritmetica() {
+    local a=7 b=3 edad
+
+    echo "→ aritmética entera con \$(( ))"
+    echo "a=$a  b=$b"
+    echo "suma:            $((a + b))"
+    echo "resta:           $((a - b))"
+    echo "producto:        $((a * b))"
+    echo "división entera: $((a / b))"
+    echo "resto:           $((a % b))"
+
+    edad=$((2026 - 1990))
+    echo "edad en 2026: $edad"
+}
+
+demo_01_read() {
+    echo "→ read -r lee una línea y la guarda en una variable"
+    echo "Linus" | {
+        read -r nombre
+        echo "leído: $nombre"
+    }
+
+    echo "→ sin -r, read interpreta las barras invertidas"
+    echo 'C:\Users\arch' | {
+        read ruta
+        echo "read:    $ruta"
+    }
+    echo 'C:\Users\arch' | {
+        read -r ruta
+        echo "read -r: $ruta"
+    }
+
+    echo "→ IFS= read -r conserva los espacios de los extremos"
+    echo "  hola   mundo  " | {
+        IFS= read -r frase
+        echo "frase: [$frase]"
+    }
+
+    echo "→ read -p combina mensaje y lectura (el mensaje se ve en la terminal):"
+    echo '  read -r -p "Nombre: " nombre'
+}
+
+# El self-test ejecuta demo_01; el nivel 1 llama a las tres partes por separado.
 demo_01() {
-    local nombre="Ada" edad=36
-
-    printf '%s\n' "→ asignación: sin espacios alrededor del ="
-    printf 'nombre=%s edad=%s\n' "$nombre" "$edad"
-
-    printf '%s\n' "→ las comillas dobles expanden; las simples no"
-    printf 'dobles: hola %s\n' "$nombre"
-    printf 'simples: hola $nombre\n'
-
-    printf '%s\n' "→ las llaves separan la variable del texto"
-    printf '%s\n' "${nombre}ismo"
-
-    printf '%s\n' "→ aritmética entera con \$(( ))"
-    printf 'edad + 4 = %s\n' "$((edad + 4))"
-
-    printf '%s\n' "→ read -r lee una línea (aquí desde una cadena)"
-    local leido
-    read -r leido <<< "Linus" || leido="Linus"
-    printf 'leído: %s\n' "$leido"
+    demo_01_variables
+    demo_01_aritmetica
+    demo_01_read
 }
 
 reto_01_1() {
@@ -1105,32 +1144,94 @@ echo Frase: $frase' \
 RETOS_01=(reto_01_1 reto_01_2)
 
 leccion_01() {
-    pantalla "Nivel 1 · ${TITULOS[1]}" "" "Escribe tu solución al final de la teoría."
-    paginar "Una variable guarda un valor con un nombre. En bash se asigna así:
+    pantalla "Nivel 1 · ${TITULOS[1]}" "Vamos a guardar datos en variables, hacer cuentas
+y leer lo que escribe el usuario." "Enter para empezar"
+    pausa || return 1
 
-  nombre=Ada          (sin espacios alrededor del =)
+    pantalla "Nivel 1 · Parte 1" "Variables y comillas" ""
+    paginar "$(cat <<'TEXTO'
+Una variable guarda un valor con un nombre. Se asigna así:
+  nombre=Ada
 
-Para usar el valor se pone \$ delante:
+No pongas espacios alrededor del =:
+  nombre = Ada    ← error
 
-  echo \"\$nombre\"      → Ada
-  echo '\$nombre'      → \$nombre   (las comillas simples son literales)
+Para usar el valor, pon $ delante:
+  echo "Hola, $nombre"     → Hola, Ada
+  echo 'Hola, $nombre'     → Hola, $nombre
 
-Las comillas dobles expanden variables; las simples no. Rodea SIEMPRE
-las variables con comillas dobles para no perder espacios:
-  echo \"\$frase\"       conserva los espacios
-  echo \$frase         los colapsa
+Las comillas dobles expanden la variable; las simples la dejan literal.
+Si el valor lleva espacios, ponlo entre comillas al asignarlo:
+  frase="hola mundo"
 
-Las llaves sirven para separar el nombre del texto que va detrás:
-  echo \"\${nombre}ismo\"
+Las llaves separan el nombre del texto que va detrás:
+  echo "${nombre}ismo"     → Adaismo
+TEXTO
+)" || return 1
+    pausa || return 1
 
-La aritmética entera va entre \$(( )):
-  edad=\$((2026 - 1990))
+    pantalla "Nivel 1 · Demo de variables" "Mira cómo se asigna y se usa una variable." ""
+    demo_01_variables
+    pausa || return 1
 
-Y read -r lee una línea. IFS= read -r conserva los espacios al principio
-y al final de la línea." \
-        || return 1
+    pantalla "Nivel 1 · Parte 2" "Aritmética entera" ""
+    paginar "$(cat <<'TEXTO'
+Bash hace aritmética entera, sin decimales, con $(( )):
+  a=7
+  b=3
 
-    demo_01
+  echo $((a + b))    → 10
+  echo $((a - b))    → 4
+  echo $((a * b))    → 21
+  echo $((a / b))    → 2    división entera
+  echo $((a % b))    → 1    resto
+
+El resultado se puede guardar en una variable:
+  edad=$((2026 - 1990))
+  echo "Edad: $edad"
+
+Dentro de $(( )) las variables van sin $:
+  $((a + b)) es lo mismo que $(($a + $b)), pero más claro.
+TEXTO
+)" || return 1
+    pausa || return 1
+
+    pantalla "Nivel 1 · Demo de aritmética" "Mira las operaciones y cómo se guarda el resultado." ""
+    demo_01_aritmetica
+    pausa || return 1
+
+    pantalla "Nivel 1 · Parte 3" "Leer datos con read" ""
+    paginar "$(cat <<'TEXTO'
+read lee una línea de la entrada y la guarda en una variable:
+  echo "¿Cómo te llamas?"
+  read -r nombre
+  echo "Hola, $nombre"
+
+-r significa «raw»: no interpreta las barras invertidas.
+  read -r ruta     guarda C:\Users\arch tal cual
+  read ruta        se come las barras: C:Usersarch
+Usa -r casi siempre.
+
+read -p muestra un mensaje y lee en la misma orden:
+  read -r -p "¿Cómo te llamas? " nombre
+El espacio final evita que el texto quede pegado a lo que escribes.
+El mensaje de -p solo se ve si hay teclado; en una tubería no.
+
+Para conservar espacios al principio y al final, vacía IFS:
+  IFS= read -r frase
+Sin IFS=, read recorta esos espacios.
+
+read lee hasta el final de la línea. Si no hay más entrada, devuelve
+un código distinto de 0. En un bucle:
+  while IFS= read -r linea; do
+      echo "$linea"
+  done
+TEXTO
+)" || return 1
+    pausa || return 1
+
+    pantalla "Nivel 1 · Demo de read" "Mira las diferencias entre read, read -r e IFS= read -r." ""
+    demo_01_read
     pausa || return 1
 
     if ejecutar_retos_de 1; then
