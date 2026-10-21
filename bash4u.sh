@@ -12,7 +12,7 @@
 
 set -uo pipefail
 
-VERSION="0.3.6"
+VERSION="0.3.7"
 DIR_DATOS="${XDG_DATA_HOME:-$HOME/.local/share}/bash4u"
 ARCH_ESTADO="$DIR_DATOS/estado"
 DIR_PRACTICAS="${BASH4U_PRACTICAS:-$HOME/bash4u-practicas}"
@@ -1533,66 +1533,119 @@ Los tienes guardados en el repaso adaptativo." "Enter para volver"
 # ------------------------------------------------------------ nivel 2 --------
 
 demo_02_salida() {
-    printf '%s\n' "→ echo imprime el texto y un salto de línea:"
-    echo "Hola, mundo"
+    local nombre nota interactivo=0
+    [[ $AUTOTEST -eq 0 && -t 0 ]] && interactivo=1
 
-    printf '\n%s\n' "→ printf no añade salto: hay que escribir \\n:"
-    printf "Hola, mundo\n"
+    printf '%s\n' "→ Vamos a usar tus datos. Escribe tu nombre y una nota."
+    if (( interactivo )); then
+        read -r -e -p "Tu nombre: " nombre || nombre=""
+        read -r -e -p "Una nota (número entero): " nota || nota=""
+    else
+        printf '%s\n' "  (demo automática: Ada y 9)"
+        nombre="Ada"
+        nota=9
+    fi
+    [[ -n $nombre ]] || nombre="Ada"
+    if [[ ! $nota =~ ^-?[0-9]+$ ]]; then
+        printf '  («%s» no es un número; uso 9 para seguir)\n' "$nota"
+        nota=9
+    fi
 
-    printf '\n%s\n' "→ printf coloca valores dentro del texto:"
-    local nombre="Ada" nota=9
+    printf '\n%s\n' "→ echo imprime el texto y un salto de línea:"
+    echo "Hola, $nombre"
+
+    printf '\n%s\n' "→ printf necesita \\n para el salto:"
+    printf "Hola, %s\n" "$nombre"
+
+    printf '\n%s\n' "→ printf rellena los huecos por orden:"
+    printf '  printf "%%s sacó un %%d\\n" "$nombre" "$nota"\n'
     printf "%s sacó un %d\n" "$nombre" "$nota"
+
+    printf '\n%s\n' "→ el primer %s toma el primer valor; el %d, el segundo:"
+    printf '  primer valor: %s\n' "$nombre"
+    printf '  segundo valor: %d\n' "$nota"
+
+    printf '\n%s\n' "→ si cambias el orden de los valores, cambia el texto:"
+    printf '  printf "nota: %%d · nombre: %%s\\n" "$nota" "$nombre"\n'
+    printf "nota: %d · nombre: %s\n" "$nota" "$nombre"
 
     printf '\n%s\n' "→ los mismos valores con echo:"
     echo "$nombre sacó un $nota"
 }
 
 demo_02_entrada() {
-    local nombre
-    printf '%s\n' "→ read lee una línea de la entrada:"
-    if [[ $AUTOTEST -eq 0 && -t 0 ]]; then
-        printf '%s' "¿Cómo te llamas? "
-        read -r -e nombre || nombre=""
+    local ciudad interactivo=0
+    [[ $AUTOTEST -eq 0 && -t 0 ]] && interactivo=1
+
+    printf '%s\n' "→ read -p muestra el mensaje y lee en la misma orden:"
+    if (( interactivo )); then
+        read -r -e -p "¿En qué ciudad vives? " ciudad || ciudad=""
     else
-        printf '%s\n' "¿Cómo te llamas? Ada (demo)"
-        nombre="Ada"
+        printf '%s\n' "¿En qué ciudad vives? Madrid (demo)"
+        ciudad="Madrid"
     fi
-    printf 'Hola, %s\n' "$nombre"
+    [[ -n $ciudad ]] || ciudad="Madrid"
+    printf 'Vives en %s\n' "$ciudad"
+
+    printf '\n%s\n' "→ sin -p, el mensaje va en un echo aparte:"
+    printf '%s\n' '  echo "¿En qué ciudad vives?"'
+    printf '%s\n' '  read -r ciudad'
+    printf '%s\n' '  echo "Vives en $ciudad"'
 }
 
 demo_02_codigos() {
+    local codigo interactivo=0
+    [[ $AUTOTEST -eq 0 && -t 0 ]] && interactivo=1
+
     printf '%s\n' "→ true sale bien (0); false sale mal (1):"
     true
     printf 'true  → $? = %s\n' "$?"
     false
     printf 'false → $? = %s\n' "$?"
 
+    printf '\n%s\n' "→ elige tú un código y mira qué devuelve exit:"
+    if (( interactivo )); then
+        read -r -e -p "Código de salida (0 a 255): " codigo || codigo=""
+    else
+        printf '%s\n' "Código de salida (0 a 255): 3 (demo)"
+        codigo=3
+    fi
+    if [[ ! $codigo =~ ^[0-9]+$ ]] || (( codigo > 255 )); then
+        printf '  («%s» no vale; uso 3)\n' "$codigo"
+        codigo=3
+    fi
+    ( exit "$codigo" )
+    printf 'un subshell con exit %s → $? = %s\n' "$codigo" "$?"
+
     printf '\n%s\n' "→ \$? cambia con cada comando:"
     false
     echo "esto imprime hola"
     printf 'después de echo, $? = %s (el de echo, no el de false)\n' "$?"
-
-    printf '\n%s\n' "→ exit N fija el código de salida del script:"
-    ( exit 3 )
-    printf 'un subshell con exit 3 → $? = %s\n' "$?"
 }
 
 demo_02_condicional() {
+    local respuesta resultado interactivo=0
+    [[ $AUTOTEST -eq 0 && -t 0 ]] && interactivo=1
+
     printf '%s\n' "→ true && ... ejecuta la parte derecha:"
     true && printf '  se imprime\n'
-
     printf '%s\n' "→ false && ... no la ejecuta:"
     false && printf '  no se imprime\n'
-
     printf '%s\n' "→ false || ... ejecuta la alternativa:"
     false || printf '  se imprime\n'
-
     printf '%s\n' "→ true || ... no la ejecuta:"
     true || printf '  no se imprime\n'
 
-    printf '\n%s\n' "→ combinación: si sale bien, «bien»; si no, «mal»:"
-    true && printf '  bien\n' || printf '  mal\n'
-    false && printf '  bien\n' || printf '  mal\n'
+    printf '\n%s\n' "→ ahora eliges tú si la condición sale bien o mal:"
+    if (( interactivo )); then
+        read -r -e -p "s = bien, n = mal: " respuesta || respuesta=""
+    else
+        printf '%s\n' "s = bien, n = mal: s (demo)"
+        respuesta="s"
+    fi
+    [[ $respuesta == s* || $respuesta == S* ]] && resultado=true || resultado=false
+    printf 'resultado: %s\n' "$resultado"
+    "$resultado" && printf '  bien\n' || printf '  mal\n'
 }
 
 # El self-test ejecuta demo_02; el nivel 2 llama a cada demo por separado.
@@ -1675,14 +1728,29 @@ printf imprime con formato y NO añade salto por su cuenta:
   printf "Hola, mundo\n"
   → Hola, mundo          (el \n es el salto de línea)
 
-printf coloca valores dentro del texto:
+printf usa una plantilla con huecos. Los huecos se rellenan
+con los valores que escribes después, EN ORDEN:
   nombre="Ada"
   nota=9
   printf "%s sacó un %d\n" "$nombre" "$nota"
   → Ada sacó un 9
 
-  %s   se sustituye por un texto
-  %d   se sustituye por un número entero
+El primer hueco (%s) toma el primer valor: "$nombre" → Ada.
+El segundo hueco (%d) toma el segundo valor: "$nota" → 9.
+No imprime «la variable anterior»: cada hueco coge su valor
+por la posición que ocupa.
+
+Otro ejemplo, ahora con dos textos:
+  printf "%s y %s\n" "Ada" "Bash"
+  → Ada y Bash
+El primer %s toma "Ada"; el segundo, "Bash".
+
+Si cambias el orden de los valores, cambia el resultado:
+  printf "nota: %d · nombre: %s\n" "$nota" "$nombre"
+  → nota: 9 · nombre: Ada
+
+  %s   hueco para un texto (string)
+  %d   hueco para un número entero (no %n)
   \n   salto de línea
 
 echo basta para mensajes sencillos. printf es más predecible
@@ -1692,7 +1760,8 @@ TEXTO
 }
 
 paso_02_demo_salida() {
-    pantalla "Nivel 2 · Demo de salida" "Mira lo que imprime cada orden, sin nada escondido." ""
+    pantalla "Nivel 2 · Demo de salida" "Escribe tu nombre y una nota: verás cómo printf
+coloca cada valor en su hueco." ""
     demo_02_salida
 }
 
@@ -1723,7 +1792,7 @@ TEXTO
 }
 
 paso_02_demo_entrada() {
-    pantalla "Nivel 2 · Demo de entrada" "Vamos a leer tu nombre con read." ""
+    pantalla "Nivel 2 · Demo de entrada" "Vamos a leer una ciudad con read -p." ""
     demo_02_entrada
 }
 
@@ -1761,7 +1830,7 @@ TEXTO
 }
 
 paso_02_demo_codigos() {
-    pantalla "Nivel 2 · Demo de códigos" "Mira cómo cambia \$? después de cada comando." ""
+    pantalla "Nivel 2 · Demo de códigos" "Elige un código de salida y mira qué devuelve exit." ""
     demo_02_codigos
 }
 
@@ -1792,7 +1861,7 @@ TEXTO
 }
 
 paso_02_demo_condicional() {
-    pantalla "Nivel 2 · Demo de && y ||" "Mira qué se ejecuta y qué no según el resultado anterior." ""
+    pantalla "Nivel 2 · Demo de && y ||" "Elige si la condición sale bien o mal y mira qué se ejecuta." ""
     demo_02_condicional
 }
 
