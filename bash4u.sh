@@ -12,7 +12,7 @@
 
 set -uo pipefail
 
-VERSION="0.3.4"
+VERSION="0.3.5"
 DIR_DATOS="${XDG_DATA_HOME:-$HOME/.local/share}/bash4u"
 ARCH_ESTADO="$DIR_DATOS/estado"
 DIR_PRACTICAS="${BASH4U_PRACTICAS:-$HOME/bash4u-practicas}"
@@ -287,8 +287,6 @@ leer_comando_nav() {
         :inicio|:reiniciar) return 3 ;;
         :salir) return 4 ;;
         *)
-
-            printf "_______________________________________________________________"        
             printf '%s\n' "${C_GRIS}  Usa Enter, :atras, :inicio o :salir.${C_RESET}"
             return 5
             ;;
@@ -301,6 +299,7 @@ pausa_nav() {
 
     local rc
     while true; do
+        printf "_______________________________________________________________\n"
         printf '%s' "${C_GRIS}(Enter) :atras :inicio :salir${C_RESET} "
         leer_comando_nav
         rc=$?
@@ -343,17 +342,35 @@ paginar() {
     fi
     (( por_pagina < 6 )) && por_pagina=6
 
+    # Si el texto solo se pasa unas líneas de una pantalla, se muestra entero.
+    # Así no aparece un «-- Más --» para dos o tres líneas sueltas.
+    (( total <= por_pagina + 6 )) && por_pagina=$total
+
     while (( i < total )); do
         inicio=$i
         fin=$((i + por_pagina))
         (( fin > total )) && fin=$total
+
+        # Si hay que cortar, se busca una línea en blanco cerca del final de
+        # la página para no partir un párrafo por la mitad.
+        if (( fin < total && por_pagina < total )); then
+            local minimo=$((inicio + por_pagina / 2)) k=$fin
+            while (( k > minimo )); do
+                if [[ -z ${lineas[k]} ]]; then
+                    fin=$((k + 1))
+                    (( fin > total )) && fin=$total
+                    break
+                fi
+                k=$((k - 1))
+            done
+        fi
+
         printf '%s\n' "${lineas[@]:i:fin-i}"
         i=$fin
         if (( i < total )); then
             [[ $AUTOTEST -eq 1 ]] && continue
             [[ -t 0 ]] || continue
             while true; do
-                printf '%s\n' "────────────────────────────────────────"
                 printf '%s' "${C_GRIS}-- Más -- (Enter) :atras :inicio :salir${C_RESET} "
                 leer_comando_nav
                 rc=$?
@@ -473,6 +490,51 @@ ${obtenido}
     return 0
 }
 
+# Ejecuta el código que el alumno lleva escrito para que lo pruebe sin
+# corregirlo. Con teclado, los datos los escribe el alumno; sin teclado,
+# se usa la primera entrada del reto.
+probar_codigo() {
+    local codigo=$1
+    local sandbox programa="reto.sh" caso entrada rc
+
+    sandbox=$(mktemp -d) || {
+        printf '%s\n' "No se pudo crear el entorno de prueba."
+        return 1
+    }
+    [[ -n $R_ARCHIVO ]] && programa=$R_ARCHIVO
+    printf '%s\n' "$codigo" > "$sandbox/$programa"
+
+    if [[ -n $R_FIXTURE ]]; then
+        ( cd "$sandbox" && bash -c "$R_FIXTURE" ) >/dev/null 2>&1
+    fi
+
+    printf '%s\n' "── Prueba ───────────────────────────────"
+    if [[ -t 0 ]]; then
+        printf '%s\n' "Ejecutando tu código tal como lo has escrito."
+        printf '%s\n' "Si pide datos, escríbelos; con Ctrl+D vuelves al reto."
+        printf '\n'
+        ( cd "$sandbox" && bash "$programa" )
+        rc=$?
+    else
+        if (( ${#R_CASOS[@]} > 0 )); then
+            caso=${R_CASOS[0]}
+            entrada=${caso%%|*}
+        else
+            entrada=""
+        fi
+        ( cd "$sandbox" && printf '%s\n' "$entrada" | bash "$programa" )
+        rc=$?
+        printf '\n%s\n' "(prueba automática con la primera entrada del reto)"
+    fi
+    printf '\n%s\n' "── Fin de la prueba (código $rc) ─────────"
+    if [[ -t 0 ]]; then
+        printf '%s\n' "Puedes seguir editando; escribe #fin para corregir el reto."
+    fi
+
+    rm -rf "$sandbox"
+    return 0
+}
+
 # ==================================================================== retos ===
 
 definir_reto() {
@@ -488,7 +550,8 @@ definir_reto() {
     R_LOGRO=""
     R_NOTA="CÓMO SE EJECUTA
 El curso ejecuta tu código con bash; no necesitas shebang ni chmod.
-La entrada de prueba la pone el curso: tú escribes solo el código."
+La entrada de prueba la pone el curso: tú escribes solo el código.
+Con :probar puedes ejecutarlo tú y escribir los datos para verlo."
     shift 7
     R_CASOS=("$@")
 }
@@ -509,7 +572,7 @@ bucle_reto() {
 ${R_NOTA}
 
 Escribe tu solución, una línea por vez y termina con #fin.
-Ayuda: :pista  ·  :ver  ·  :borrar  ·  :cancelar
+Ayuda: :pista  ·  :probar  ·  :ver  ·  :borrar  ·  :cancelar
 ────────────────────────────────────────
 Atajos: Enter avanza · :atras vuelve · :inicio reinicia · :salir sale"
 
@@ -542,6 +605,14 @@ Atajos: Enter avanza · :atras vuelve · :inicio reinicia · :salir sale"
                     printf '%s\n' "Pista: $R_PISTA"
                     EST_PISTAS=$((EST_PISTAS + 1))
                     guardar_estado
+                    continue ;;
+                ":probar"|":ejecutar")
+                    if (( ${#lineas[@]} == 0 )); then
+                        printf '%s\n' "Todavía no has escrito código. Escribe alguna línea y vuelve a probar."
+                        continue
+                    fi
+                    codigo=$(printf '%s\n' "${lineas[@]}")
+                    probar_codigo "$codigo"
                     continue ;;
                 ":cancelar")
                     printf '%s\n' "Reto cancelado."
@@ -953,9 +1024,7 @@ RETOS_00=(reto_00_1 reto_00_2 reto_00_3)
 paso_00_intro() {
     pantalla "Nivel 0 · ${TITULOS[0]}" "Vamos despacio, desde el principio.
 No hace falta saber nada de programación.
-Al final escribirás y ejecutarás tus propios archivos.
-
-Atajos: Enter avanza · :atras vuelve · :inicio reinicia · :salir sale." "Enter para empezar"
+Al final escribirás y ejecutarás tus propios archivos." ""
 }
 
 paso_00_terminal() {
@@ -1148,8 +1217,7 @@ leccion_00() {
     fi
 
     pantalla "Nivel 0" "Aún quedan retos pendientes.
-Los tienes guardados en el repaso adaptativo.
-────────────────────────────────────────" "Enter para volver"
+Los tienes guardados en el repaso adaptativo." "Enter para volver"
     pausa
     return 1
 }
@@ -1239,79 +1307,76 @@ reto_01_1() {
     definir_reto \
         "1.1" \
         "OBJETIVO
-Pide dos números, léelos con read y muestra su suma y su producto.
-Es el uso habitual de read: preguntar, leer y responder.
+Guarda dos números en variables y muestra su suma y su producto.
+Los números van escritos en tu código: no hay que leerlos de ningún sitio.
 
 CÓMO
-- Dos lecturas con read -r -p: la primera línea se guarda en a
-  y la segunda en b.
-  read -r -p \"Primer número: \" a
-- Suma: \$((a + b)). Producto: \$((a * b)).
-- Imprime exactamente:
-  suma: <resultado>
-  producto: <resultado>
+  1. Guarda 7 en a y 3 en b:
+       a=7
+       b=3
+  2. Imprime la suma y el producto:
+       echo \"suma: \$((a + b))\"
+       echo \"producto: \$((a * b))\"
 
-EJEMPLO: 3 y 4 → a=3, b=4 → suma: 7 · producto: 12
-Los mensajes de -p no forman parte de la salida." \
-        "Lee cada número con read -r -p y calcula con \$(( ))." \
-        'read -r -p "Primer número: " a
-read -r -p "Segundo número: " b
+SALIDA ESPERADA
+  suma: 10
+  producto: 21
+
+Pruébalo con :probar: ejecuta tu código y ves el resultado al momento." \
+        "Asigna a=7 y b=3. Después usa \$((a + b)) y \$((a * b)) dentro de echo." \
+        'a=7
+b=3
 echo "suma: $((a + b))"
 echo "producto: $((a * b))"' \
-        'read -r a
-read -r b
-echo "suma: $a"
-echo "producto: $b"' \
+        'a=7
+b=3
+echo "suma: $((a - b))"
+echo "producto: $((a + b))"' \
         '' 5 \
-        "3
-4|suma: 7
-producto: 12|0" \
-        "0
-5|suma: 5
-producto: 0|0" \
-        "-2
-3|suma: 1
-producto: -6|0"
-    R_LOGRO="Has leído dos números con read y has calculado con \$(( ))."
+        "|suma: 10
+producto: 21|0"
+    R_LOGRO="Has guardado números en variables y has calculado la suma y el producto."
 }
 
 reto_01_2() {
     definir_reto \
         "1.2" \
         "OBJETIVO
-Pide tu nombre y tu ciudad, y muestra un saludo personalizado.
+Comprueba la diferencia entre comillas dobles y comillas simples.
 
 CÓMO
-- Dos lecturas con read -r -p: una para el nombre y otra para la ciudad.
-- Imprime exactamente:
-  Hola, <nombre> de <ciudad>!
+  1. Guarda Ada en la variable nombre:
+       nombre=Ada
+  2. Imprime el saludo con comillas dobles:
+       echo \"Hola, \$nombre\"
+     Las comillas dobles expanden la variable.
+  3. Imprime el mismo texto con comillas simples:
+       echo 'Hola, \$nombre'
+     Las comillas simples lo dejan literal.
 
-EJEMPLO: Ada y Madrid → Hola, Ada de Madrid!
-Los mensajes de -p no forman parte de la salida." \
-        "Lee cada dato con read -r -p y úsalos en el echo final." \
-        'read -r -p "Nombre: " nombre
-read -r -p "Ciudad: " ciudad
-echo "Hola, $nombre de $ciudad!"' \
-        'read -r nombre
-read -r ciudad
-echo "Hola, $nombre"' \
+SALIDA ESPERADA
+  Hola, Ada
+  Hola, \$nombre
+
+Pruébalo con :probar y observa la diferencia al momento." \
+        "Usa nombre=Ada y dos echo: uno con comillas dobles y otro con simples." \
+        'nombre=Ada
+echo "Hola, $nombre"
+echo '"'"'Hola, $nombre'"'"'' \
+        'nombre=Ada
+echo '"'"'Hola, $nombre'"'"'
+echo '"'"'Hola, $nombre'"'"'' \
         '' 5 \
-        "Ada
-Madrid|Hola, Ada de Madrid!|0" \
-        "Luis
-Barcelona|Hola, Luis de Barcelona!|0" \
-        "María
-Sevilla|Hola, María de Sevilla!|0"
-    R_LOGRO="Has leído dos textos con read y los has combinado en un saludo."
+        "|Hola, Ada
+Hola, \$nombre|0"
+    R_LOGRO="Has visto cómo las comillas dobles expanden la variable y las simples la dejan literal."
 }
 
 RETOS_01=(reto_01_1 reto_01_2)
 
 paso_01_intro() {
     pantalla "Nivel 1 · ${TITULOS[1]}" "Vamos a guardar datos en variables, hacer cuentas
-y leer lo que escribe el usuario.
-
-Atajos: Enter avanza · :atras vuelve · :inicio reinicia · :salir sale." "Enter para empezar"
+y leer lo que escribe el usuario." ""
 }
 
 paso_01_variables() {
@@ -1422,15 +1487,15 @@ paso_01_demo_read_p() {
 }
 
 paso_01_como_probar() {
-    pantalla "Nivel 1 · Cómo se prueban los retos" "En un reto no escribes la entrada: escribes tu código y terminas
-con una línea que sea solo #fin.
+    pantalla "Nivel 1 · Cómo se prueban los retos" "Escribe tu código, una línea por vez, y termina con #fin.
 
-Después el curso ejecuta tu código y le pasa los datos de prueba
-automáticamente. Compara la salida y el código de salida.
+El curso lo ejecuta y compara la salida con la esperada.
 
-read -p funciona en un script normal, pero en la corrección no se ve
-su mensaje: la entrada llega por una tubería, no por un teclado.
-En las demos sí lo ves porque estás escribiendo tú." "Enter para empezar los retos"
+Antes de corregir puedes usar :probar: ejecuta tu código tal cual
+y ves el resultado al momento.
+
+En estos retos no hay que leer datos: los valores van en el código,
+así que lo que ves con :probar es exactamente lo que se corrige." ""
 }
 
 PASOS_01=(
@@ -1455,8 +1520,7 @@ leccion_01() {
     fi
 
     pantalla "Nivel 1" "Aún quedan retos pendientes.
-Los tienes guardados en el repaso adaptativo.
-────────────────────────────────────────" "Enter para volver"
+Los tienes guardados en el repaso adaptativo." "Enter para volver"
     pausa
     return 1
 }
@@ -1522,9 +1586,7 @@ echo ok' \
 RETOS_02=(reto_02_1)
 
 paso_02_intro() {
-    pantalla "Nivel 2 · ${TITULOS[2]}" "Un script lee datos, produce salida y dice si salió bien.
-
-Atajos: Enter avanza · :atras vuelve · :inicio reinicia · :salir sale." "Enter para empezar"
+    pantalla "Nivel 2 · ${TITULOS[2]}" "Un script lee datos, produce salida y dice si salió bien." ""
 }
 
 paso_02_teoria() {
@@ -1565,8 +1627,7 @@ leccion_02() {
     fi
 
     pantalla "Nivel 2" "Aún quedan retos pendientes.
-Los tienes guardados en el repaso adaptativo.
-────────────────────────────────────────" "Enter para volver"
+Los tienes guardados en el repaso adaptativo." "Enter para volver"
     pausa
     return 1
 }
@@ -1717,9 +1778,7 @@ fin|0"
 RETOS_04=(reto_04_1 reto_04_2)
 
 paso_04_intro() {
-    pantalla "Nivel 4 · ${TITULOS[4]}" "Los bucles repiten trabajo y case elige entre opciones.
-
-Atajos: Enter avanza · :atras vuelve · :inicio reinicia · :salir sale." "Enter para empezar"
+    pantalla "Nivel 4 · ${TITULOS[4]}" "Los bucles repiten trabajo y case elige entre opciones." ""
 }
 
 paso_04_teoria() {
@@ -1758,8 +1817,7 @@ leccion_04() {
     fi
 
     pantalla "Nivel 4" "Aún quedan retos pendientes.
-Los tienes guardados en el repaso adaptativo.
-────────────────────────────────────────" "Enter para volver"
+Los tienes guardados en el repaso adaptativo." "Enter para volver"
     pausa
     return 1
 }
