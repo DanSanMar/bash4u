@@ -264,6 +264,7 @@ pausa() {
     [[ $AUTOTEST -eq 1 ]] && return 0
     # Sin teclado (por ejemplo, entrada por tubería) no tiene sentido pedir Enter.
     [[ -t 0 ]] || return 0
+    printf "_______________________________________________________________\n"
     printf '%s' "${C_GRIS}(Enter para continuar)${C_RESET} "
     IFS= read -r -e _ || return 1
     return 0
@@ -286,6 +287,8 @@ leer_comando_nav() {
         :inicio|:reiniciar) return 3 ;;
         :salir) return 4 ;;
         *)
+
+            printf "_______________________________________________________________"        
             printf '%s\n' "${C_GRIS}  Usa Enter, :atras, :inicio o :salir.${C_RESET}"
             return 5
             ;;
@@ -350,6 +353,7 @@ paginar() {
             [[ $AUTOTEST -eq 1 ]] && continue
             [[ -t 0 ]] || continue
             while true; do
+                printf '%s\n' "────────────────────────────────────────"
                 printf '%s' "${C_GRIS}-- Más -- (Enter) :atras :inicio :salir${C_RESET} "
                 leer_comando_nav
                 rc=$?
@@ -505,7 +509,9 @@ bucle_reto() {
 ${R_NOTA}
 
 Escribe tu solución, una línea por vez y termina con #fin.
-Ayuda: :pista  ·  :ver  ·  :borrar  ·  :cancelar"
+Ayuda: :pista  ·  :ver  ·  :borrar  ·  :cancelar
+────────────────────────────────────────
+Atajos: Enter avanza · :atras vuelve · :inicio reinicia · :salir sale"
 
         while true; do
             printf '%s' "${C_PROMPT}> ${C_RESET}"
@@ -1142,7 +1148,8 @@ leccion_00() {
     fi
 
     pantalla "Nivel 0" "Aún quedan retos pendientes.
-Los tienes guardados en el repaso adaptativo." "Enter para volver"
+Los tienes guardados en el repaso adaptativo.
+────────────────────────────────────────" "Enter para volver"
     pausa
     return 1
 }
@@ -1220,47 +1227,12 @@ demo_01_read_p() {
     echo '  echo "ciudad: $ciudad"'
 }
 
-demo_01_read_r_ifs() {
-    local ruta texto interactivo=0
-
-    [[ $AUTOTEST -eq 0 && -t 0 ]] && interactivo=1
-
-    echo "→ -r evita que se coman las barras invertidas"
-    echo 'C:\Users\arch' | {
-        read ruta
-        echo "read:     $ruta"
-    }
-    echo 'C:\Users\arch' | {
-        read -r ruta
-        echo "read -r:  $ruta"
-    }
-
-    echo
-    echo "→ IFS= read -r copia la línea entera, con sus espacios"
-    echo '  hola   mundo  ' | {
-        read texto
-        echo "read:       [$texto]"
-    }
-    echo '  hola   mundo  ' | {
-        IFS= read -r texto
-        echo "IFS= read:  [$texto]"
-    }
-
-    if (( interactivo )); then
-        echo
-        echo "Prueba tú: escribe una frase con espacios al principio o al final."
-        IFS= read -r -e -p "Escribe una frase: " texto || texto=""
-        echo "texto: [$texto]"
-    fi
-}
-
 # El self-test ejecuta demo_01; el nivel 1 llama a cada demo por separado.
 demo_01() {
     demo_01_variables
     demo_01_aritmetica
     demo_01_read_basico
     demo_01_read_p
-    demo_01_read_r_ifs
 }
 
 reto_01_1() {
@@ -1307,35 +1279,30 @@ reto_01_2() {
     definir_reto \
         "1.2" \
         "OBJETIVO
-Lee una línea completa sin perder los espacios de los extremos.
+Pide tu nombre y tu ciudad, y muestra un saludo personalizado.
 
 CÓMO
-1. IFS= read -r -p \"Escribe una frase: \" texto
-2. echo \"Frase: \$texto\"
+- Dos lecturas con read -r -p: una para el nombre y otra para la ciudad.
+- Imprime exactamente:
+  Hola, <nombre> de <ciudad>!
 
-No confundas:
-  \"Escribe una frase: \"  → mensaje al pedir la línea
-  texto                  → variable con lo leído
-  \"Frase: \$texto\"        → línea que se corrige
-
-La variable se llama texto; Frase: es solo la etiqueta de la salida.
-
-ENTRADA: «  hola   mundo»
-SALIDA:  «Frase:   hola   mundo»
-
-El IFS= vacío conserva los espacios de los extremos." \
-        "Usa IFS= read -r -p \"Escribe una frase: \" texto y luego echo \"Frase: \$texto\".
-La variable texto guarda la línea; Frase: es solo la etiqueta." \
-        'IFS= read -r -p "Escribe una frase: " texto
-echo "Frase: $texto"' \
-        'read texto
-echo "Frase: $texto"' \
+EJEMPLO: Ada y Madrid → Hola, Ada de Madrid!
+Los mensajes de -p no forman parte de la salida." \
+        "Lee cada dato con read -r -p y úsalos en el echo final." \
+        'read -r -p "Nombre: " nombre
+read -r -p "Ciudad: " ciudad
+echo "Hola, $nombre de $ciudad!"' \
+        'read -r nombre
+read -r ciudad
+echo "Hola, $nombre"' \
         '' 5 \
-        "  hola   mundo|Frase:   hola   mundo|0"
-    R_NOTA="CÓMO SE EJECUTA
-No necesitas shebang. La frase la pone el curso: no la escribas.
-read -p no muestra el mensaje al corregir: la entrada llega por tubería."
-    R_LOGRO="Has conservado los espacios con IFS= read -r y la variable texto."
+        "Ada
+Madrid|Hola, Ada de Madrid!|0" \
+        "Luis
+Barcelona|Hola, Luis de Barcelona!|0" \
+        "María
+Sevilla|Hola, María de Sevilla!|0"
+    R_LOGRO="Has leído dos textos con read y los has combinado en un saludo."
 }
 
 RETOS_01=(reto_01_1 reto_01_2)
@@ -1404,7 +1371,7 @@ paso_01_demo_aritmetica() {
 }
 
 paso_01_read_basico() {
-    pantalla "Nivel 1 · Parte 3" "Leer datos con read" ""
+    pantalla "Nivel 1 · Parte 2" "Leer datos con read" ""
     paginar "$(cat <<'TEXTO'
 read lee una línea de la entrada y la guarda en una variable.
 Por sí solo no imprime nada: espera a que escribas y pulses Enter.
@@ -1439,10 +1406,10 @@ read -p muestra el mensaje y lee en la misma orden:
 El espacio final del mensaje separa el texto de lo que escribes.
 Esta es la forma más habitual dentro de un script.
 
--r significa «raw»: no interpreta las barras invertidas.
-  read -r ruta     guarda C:\Users\arch tal cual
+-r significa «raw»: evita que se interpreten barras invertidas.
+  read -r ruta     guarda C:\\Users\\arch tal cual
   read ruta        se come las barras: C:Usersarch
-Usa -r casi siempre.
+Usa -r casi siempre para leer texto tal cual.
 
 En un reto no hace falta -p: la entrada ya llega por la tubería.
 TEXTO
@@ -1452,31 +1419,6 @@ TEXTO
 paso_01_demo_read_p() {
     pantalla "Nivel 1 · Demo de read -p" "Ahora el mensaje va dentro de read." ""
     demo_01_read_p
-}
-
-paso_01_read_ifs() {
-    pantalla "Nivel 1 · Parte 3" "IFS y espacios" ""
-    paginar "$(cat <<'TEXTO'
-IFS contiene los separadores que usa read: espacio, tabulador y salto
-de línea. Por eso read recorta los espacios de los extremos.
-
-Para copiar la línea entera, incluidos esos espacios, vacía IFS solo
-para esa orden:
-  IFS= read -r texto
-  echo "[$texto]"
-
-Con la entrada «  hola   mundo  »:
-  read texto           → [hola   mundo]
-  IFS= read -r texto   → [  hola   mundo  ]
-
-El IFS= de delante solo afecta a esa orden; no cambia IFS para siempre.
-TEXTO
-)"
-}
-
-paso_01_demo_read_ifs() {
-    pantalla "Nivel 1 · Demo de -r e IFS=" "Mira las barras y los espacios. Al final puedes probar una frase." ""
-    demo_01_read_r_ifs
 }
 
 paso_01_como_probar() {
@@ -1501,8 +1443,6 @@ PASOS_01=(
     paso_01_demo_read_basico
     paso_01_read_p
     paso_01_demo_read_p
-    paso_01_read_ifs
-    paso_01_demo_read_ifs
     paso_01_como_probar
 )
 
@@ -1515,7 +1455,8 @@ leccion_01() {
     fi
 
     pantalla "Nivel 1" "Aún quedan retos pendientes.
-Los tienes guardados en el repaso adaptativo." "Enter para volver"
+Los tienes guardados en el repaso adaptativo.
+────────────────────────────────────────" "Enter para volver"
     pausa
     return 1
 }
@@ -1624,7 +1565,8 @@ leccion_02() {
     fi
 
     pantalla "Nivel 2" "Aún quedan retos pendientes.
-Los tienes guardados en el repaso adaptativo." "Enter para volver"
+Los tienes guardados en el repaso adaptativo.
+────────────────────────────────────────" "Enter para volver"
     pausa
     return 1
 }
@@ -1816,7 +1758,8 @@ leccion_04() {
     fi
 
     pantalla "Nivel 4" "Aún quedan retos pendientes.
-Los tienes guardados en el repaso adaptativo." "Enter para volver"
+Los tienes guardados en el repaso adaptativo.
+────────────────────────────────────────" "Enter para volver"
     pausa
     return 1
 }
