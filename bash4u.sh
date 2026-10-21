@@ -12,7 +12,7 @@
 
 set -uo pipefail
 
-VERSION="0.3.5"
+VERSION="0.3.6"
 DIR_DATOS="${XDG_DATA_HOME:-$HOME/.local/share}/bash4u"
 ARCH_ESTADO="$DIR_DATOS/estado"
 DIR_PRACTICAS="${BASH4U_PRACTICAS:-$HOME/bash4u-practicas}"
@@ -1532,45 +1532,111 @@ Los tienes guardados en el repaso adaptativo." "Enter para volver"
 
 # ------------------------------------------------------------ nivel 2 --------
 
-demo_02() {
-    printf '%s\n' "→ printf con formato"
-    printf 'Hola, %s. Tu número favorito es %03d.\n' "Ada" 7
+demo_02_salida() {
+    printf '%s\n' "→ echo imprime el texto y un salto de línea:"
+    echo "Hola, mundo"
 
-    printf '%s\n' "→ códigos de salida: 0 es éxito"
+    printf '\n%s\n' "→ printf no añade salto: hay que escribir \\n:"
+    printf "Hola, mundo\n"
+
+    printf '\n%s\n' "→ printf coloca valores dentro del texto:"
+    local nombre="Ada" nota=9
+    printf "%s sacó un %d\n" "$nombre" "$nota"
+
+    printf '\n%s\n' "→ los mismos valores con echo:"
+    echo "$nombre sacó un $nota"
+}
+
+demo_02_entrada() {
+    local nombre
+    printf '%s\n' "→ read lee una línea de la entrada:"
+    if [[ $AUTOTEST -eq 0 && -t 0 ]]; then
+        printf '%s' "¿Cómo te llamas? "
+        read -r -e nombre || nombre=""
+    else
+        printf '%s\n' "¿Cómo te llamas? Ada (demo)"
+        nombre="Ada"
+    fi
+    printf 'Hola, %s\n' "$nombre"
+}
+
+demo_02_codigos() {
+    printf '%s\n' "→ true sale bien (0); false sale mal (1):"
     true
-    printf 'true  -> $? = %s\n' "$?"
+    printf 'true  → $? = %s\n' "$?"
     false
-    printf 'false -> $? = %s\n' "$?"
+    printf 'false → $? = %s\n' "$?"
 
-    printf '%s\n' "→ && y ||"
-    true && printf '%s\n' "esto se imprime (&&)"
-    false || printf '%s\n' "esto también (||)"
+    printf '\n%s\n' "→ \$? cambia con cada comando:"
+    false
+    echo "esto imprime hola"
+    printf 'después de echo, $? = %s (el de echo, no el de false)\n' "$?"
 
-    printf '%s\n' "→ echo -e no es portable; printf sí"
-    printf 'linea1\nlinea2\n'
+    printf '\n%s\n' "→ exit N fija el código de salida del script:"
+    ( exit 3 )
+    printf 'un subshell con exit 3 → $? = %s\n' "$?"
+}
+
+demo_02_condicional() {
+    printf '%s\n' "→ true && ... ejecuta la parte derecha:"
+    true && printf '  se imprime\n'
+
+    printf '%s\n' "→ false && ... no la ejecuta:"
+    false && printf '  no se imprime\n'
+
+    printf '%s\n' "→ false || ... ejecuta la alternativa:"
+    false || printf '  se imprime\n'
+
+    printf '%s\n' "→ true || ... no la ejecuta:"
+    true || printf '  no se imprime\n'
+
+    printf '\n%s\n' "→ combinación: si sale bien, «bien»; si no, «mal»:"
+    true && printf '  bien\n' || printf '  mal\n'
+    false && printf '  bien\n' || printf '  mal\n'
+}
+
+# El self-test ejecuta demo_02; el nivel 2 llama a cada demo por separado.
+demo_02() {
+    demo_02_salida
+    demo_02_entrada
+    demo_02_codigos
+    demo_02_condicional
 }
 
 reto_02_1() {
     definir_reto \
         "2.1" \
         "OBJETIVO
-Lee un número y clasifícalo.
+Lee un número y di si está entre 1 y 10.
 
-ENTRADA
-Un número por la entrada estándar.
+DE DÓNDE SALE EL NÚMERO
+No lo escribas dentro del reto: el curso te lo da por la entrada,
+como si lo tecleara alguien. Con :probar puedes escribirlo tú.
 
-SALIDA ESPERADA
-Si está entre 1 y 10 (incluidos):
-  ok
-En cualquier otro caso:
-  fuera de rango
+QUÉ DEBE PASAR
+  Si está entre 1 y 10 (incluidos): imprime ok y termina con 0.
+  Si no: imprime fuera de rango y termina con 1.
 
-CÓDIGO DE SALIDA
-0 si está dentro del rango; 1 si está fuera.
+PASO A PASO
+  1. Lee el número y guárdalo en n:
+       read -r n
+  2. Comprueba que es un número y que está en el rango. Un if sirve:
+       if [[ \$n =~ ^[0-9]+\$ ]] && (( n >= 1 && n <= 10 )); then
+         echo ok
+       else
+         echo \"fuera de rango\"
+         exit 1
+       fi
 
-Un valor no numérico (por ejemplo, abc), el cero y los negativos
-también cuentan como fuera de rango." \
-        "Usa read -r para leer, [[ \$n =~ ^[0-9]+\$ ]] o (( )) para comprobar, y exit 1 en la rama de error." \
+EJEMPLOS
+  entrada 5   → ok             (código 0)
+  entrada 42  → fuera de rango (código 1)
+  entrada abc → fuera de rango (código 1)
+
+El if lo verás a fondo en el nivel 3; aquí basta con usarlo tal cual.
+Un valor no numérico, el cero y los negativos cuentan como fuera." \
+        "Lee con read -r n. Comprueba con [[ \$n =~ ^[0-9]+\$ ]] y (( n >= 1 && n <= 10 )).
+Si no se cumple, imprime fuera de rango y usa exit 1." \
         'read -r n
 if [[ $n =~ ^[0-9]+$ ]] && (( n >= 1 && n <= 10 )); then
   echo ok
@@ -1591,36 +1657,168 @@ echo ok' \
 RETOS_02=(reto_02_1)
 
 paso_02_intro() {
-    pantalla "Nivel 2 · ${TITULOS[2]}" "Un script lee datos, produce salida y dice si salió bien." ""
+    pantalla "Nivel 2 · ${TITULOS[2]}" "Un script hace tres cosas: recibe datos, escribe resultados
+y dice si salió bien." ""
 }
 
-paso_02_teoria() {
-    pantalla "Nivel 2 · Teoría" "Entrada, salida y códigos de estado" ""
-    paginar "Un script hace tres cosas: leer datos, producir salida y decir si salió bien.
+paso_02_salida() {
+    pantalla "Nivel 2 · Parte 1" "Salida: echo y printf" ""
+    paginar "$(cat <<'TEXTO'
+Un script escribe su resultado en la salida estándar (stdout).
+En una terminal, eso se ve en pantalla.
 
-• read -r variable   lee una línea de la entrada estándar.
-• printf '%s\\n' ...  imprime con formato predecible.
-• echo ...           atajo cómodo, pero -e y -n varían entre sistemas.
-• \$?                 código de salida del último comando (0 = éxito).
-• exit N             termina el script con el código N.
-• cmd1 && cmd2       ejecuta cmd2 solo si cmd1 salió bien.
-• cmd1 || cmd2       ejecuta cmd2 solo si cmd1 falló.
+echo imprime el texto y añade un salto de línea:
+  echo "Hola, mundo"
+  → Hola, mundo
 
-Regla de oro: un script debe devolver 0 cuando hizo su trabajo,
-y un código distinto de 0 cuando no pudo hacerlo.
+printf imprime con formato y NO añade salto por su cuenta:
+  printf "Hola, mundo\n"
+  → Hola, mundo          (el \n es el salto de línea)
 
-En el reto, ojo al detalle: la salida debe ser exactamente la pedida."
+printf coloca valores dentro del texto:
+  nombre="Ada"
+  nota=9
+  printf "%s sacó un %d\n" "$nombre" "$nota"
+  → Ada sacó un 9
+
+  %s   se sustituye por un texto
+  %d   se sustituye por un número entero
+  \n   salto de línea
+
+echo basta para mensajes sencillos. printf es más predecible
+cuando el texto lleva formato, saltos o varios valores.
+TEXTO
+)"
 }
 
-paso_02_demo() {
-    pantalla "Nivel 2 · Demo" "Mira printf, los códigos de salida y && / ||." ""
-    demo_02
+paso_02_demo_salida() {
+    pantalla "Nivel 2 · Demo de salida" "Mira lo que imprime cada orden, sin nada escondido." ""
+    demo_02_salida
+}
+
+paso_02_entrada() {
+    pantalla "Nivel 2 · Parte 2" "Entrada: read" ""
+    paginar "$(cat <<'TEXTO'
+La entrada estándar (stdin) es de donde el script lee datos.
+read toma una línea de ahí y la guarda en una variable.
+
+  echo "¿Cómo te llamas?"
+  read -r nombre
+  echo "Hola, $nombre"
+
+Al ejecutarlo e interactuar:
+  ¿Cómo te llamas?
+  Ada
+  Hola, Ada
+
+read -p junta el mensaje y la lectura:
+  read -r -p "¿Cómo te llamas? " nombre
+  → ¿Cómo te llamas? Ada
+
+La opción -r evita que se coman las barras invertidas.
+En los retos, el curso puede darte la entrada ya escrita;
+con :probar puedes teclearla tú y ver el resultado.
+TEXTO
+)"
+}
+
+paso_02_demo_entrada() {
+    pantalla "Nivel 2 · Demo de entrada" "Vamos a leer tu nombre con read." ""
+    demo_02_entrada
+}
+
+paso_02_codigos() {
+    pantalla "Nivel 2 · Parte 3" "Códigos de salida: \$? y exit" ""
+    paginar "$(cat <<'TEXTO'
+Cada comando termina con un número: su código de salida.
+  0       salió bien
+  otro    hubo un problema
+
+$? guarda el código del último comando:
+  true
+  echo $?
+  → 0
+
+  false
+  echo $?
+  → 1
+
+exit N termina el script con ese código:
+  exit 1
+  → el script termina con código 1
+
+Ojo: cada comando cambia $?. Este echo lo pisa:
+  false
+  echo "hola"
+  echo $?
+  → hola
+  → 0        (el 0 es de echo, no de false)
+
+Regla de oro: un script devuelve 0 si hizo su trabajo y un código
+distinto de 0 si no pudo hacerlo.
+TEXTO
+)"
+}
+
+paso_02_demo_codigos() {
+    pantalla "Nivel 2 · Demo de códigos" "Mira cómo cambia \$? después de cada comando." ""
+    demo_02_codigos
+}
+
+paso_02_condicional() {
+    pantalla "Nivel 2 · Parte 4" "&& y ||: actuar según el código" ""
+    paginar "$(cat <<'TEXTO'
+&& ejecuta la parte derecha solo si la izquierda salió bien (0):
+  true && echo "sí"
+  → sí
+
+  false && echo "no"
+  → (no imprime nada)
+
+|| ejecuta la parte derecha solo si la izquierda falló (distinto de 0):
+  false || echo "alternativa"
+  → alternativa
+
+  true || echo "no"
+  → (no imprime nada)
+
+Se pueden combinar:
+  true && echo "bien" || echo "mal"
+  → bien
+
+Son atajos de un if para decisiones de una sola línea.
+TEXTO
+)"
+}
+
+paso_02_demo_condicional() {
+    pantalla "Nivel 2 · Demo de && y ||" "Mira qué se ejecuta y qué no según el resultado anterior." ""
+    demo_02_condicional
+}
+
+paso_02_como_probar() {
+    pantalla "Nivel 2 · Cómo se prueban los retos" "Escribe tu código, una línea por vez, y termina con #fin.
+
+El curso lo ejecuta y compara la salida y el código de salida.
+
+Con :probar puedes ejecutarlo antes. Si el reto pide datos, los
+escribes tú y ves el resultado al momento.
+
+En el reto 2.1 el curso te dará el número; no lo escribas dentro.
+Con :probar puedes probar con 5, 42 o abc." ""
 }
 
 PASOS_02=(
     paso_02_intro
-    paso_02_teoria
-    paso_02_demo
+    paso_02_salida
+    paso_02_demo_salida
+    paso_02_entrada
+    paso_02_demo_entrada
+    paso_02_codigos
+    paso_02_demo_codigos
+    paso_02_condicional
+    paso_02_demo_condicional
+    paso_02_como_probar
 )
 
 leccion_02() {
