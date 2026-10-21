@@ -232,7 +232,9 @@ configurar_colores() {
 }
 
 cabecera_ui() {
+    printf '%s\n' "────────────────────────────────────────"
     printf '%s\n' "${C_XP}XP ${EST_XP} · $(rango_actual)${C_RESET}   ${C_GRIS}bash4u ${VERSION}${C_RESET}"
+    printf '%s\n' "────────────────────────────────────────"
 }
 
 hay_color() {
@@ -251,7 +253,8 @@ pantalla() {
 
     command -v clear >/dev/null 2>&1 && clear
     cabecera_ui
-    printf '%s\n\n' "${C_TITULO}${titulo}${C_RESET}"
+    printf '%s\n' "${C_TITULO}${titulo}${C_RESET}"
+    printf '%s\n\n' "────────────────────────────────────────"
     [[ -n $cuerpo ]] && printf '%s\n' "$cuerpo"
     if [[ -n $pie ]]; then
         printf '%s\n' "────────────────────────────────────────"
@@ -264,7 +267,7 @@ pausa() {
     [[ $AUTOTEST -eq 1 ]] && return 0
     # Sin teclado (por ejemplo, entrada por tubería) no tiene sentido pedir Enter.
     [[ -t 0 ]] || return 0
-    printf "_______________________________________________________________\n"
+    printf '%s\n' "────────────────────────────────────────"
     printf '%s' "${C_GRIS}(Enter para continuar)${C_RESET} "
     IFS= read -r -e _ || return 1
     return 0
@@ -299,7 +302,7 @@ pausa_nav() {
 
     local rc
     while true; do
-        printf "_______________________________________________________________\n"
+        printf '%s\n' "────────────────────────────────────────"
         printf '%s' "${C_GRIS}(Enter) :atras :inicio :salir${C_RESET} "
         leer_comando_nav
         rc=$?
@@ -550,8 +553,8 @@ definir_reto() {
     R_LOGRO=""
     R_NOTA="CÓMO SE EJECUTA
 El curso ejecuta tu código con bash; no necesitas shebang ni chmod.
-La entrada de prueba la pone el curso: tú escribes solo el código.
-Con :probar puedes ejecutarlo tú y escribir los datos para verlo."
+Si el reto necesita datos, los pone el curso: tú escribes el código.
+Con :probar puedes ejecutarlo tú y ver el resultado al momento."
     shift 7
     R_CASOS=("$@")
 }
@@ -964,7 +967,7 @@ echo "Adiós"' \
     R_ARCHIVO="hola.sh"
     R_NOTA="CÓMO SE EJECUTA
 El curso guarda tu texto como hola.sh y lo ejecuta con bash.
-No hace falta chmod +x."
+No hace falta chmod +x. Con :probar puedes ejecutarlo antes."
     R_LOGRO="Has escrito un script con shebang y lo has ejecutado con bash."
 }
 
@@ -991,7 +994,8 @@ La salida debe ser Hola,   mundo (sin comillas alrededor)." \
     R_ARCHIVO="comillas.sh"
     R_NOTA="CÓMO SE EJECUTA
 El curso guarda tu texto como comillas.sh y lo ejecuta con bash.
-No necesitas shebang ni chmod; aquí lo importante es la línea de echo."
+No necesitas shebang ni chmod; aquí lo importante es la línea de echo.
+Con :probar puedes ejecutarlo antes."
     R_LOGRO="Has usado comillas para conservar los espacios."
 }
 
@@ -1015,7 +1019,8 @@ El símbolo > escribe la salida en un archivo en vez de en la pantalla." \
     R_CHEQUEO='[[ -f saludo.txt ]] && [[ "$(cat saludo.txt)" == "Hola, bash" ]]'
     R_NOTA="CÓMO SE EJECUTA
 El curso ejecuta tu código con bash; no necesitas shebang ni chmod.
-Después comprueba que saludo.txt existe y contiene el texto."
+Después comprueba que saludo.txt existe y contiene el texto.
+Con :probar puedes ejecutarlo antes."
     R_LOGRO="Has usado > para crear saludo.txt con el texto dentro."
 }
 
