@@ -12,7 +12,7 @@
 
 set -uo pipefail
 
-VERSION="0.3.7"
+VERSION="0.3.8"
 DIR_DATOS="${XDG_DATA_HOME:-$HOME/.local/share}/bash4u"
 ARCH_ESTADO="$DIR_DATOS/estado"
 DIR_PRACTICAS="${BASH4U_PRACTICAS:-$HOME/bash4u-practicas}"
@@ -340,14 +340,16 @@ paginar() {
     lineas+=("$resto")
     local total=${#lineas[@]} i=0 por_pagina=18 fin inicio rc
 
+    # Regla de la media pantalla: ninguna página llena la terminal.
+    # Se usa la mitad de las líneas disponibles (mínimo 6).
     if [[ $MODO_PLANO -eq 0 && -t 1 ]] && command -v tput >/dev/null 2>&1; then
-        por_pagina=$(($(tput lines 2>/dev/null || printf '24') - 9))
+        por_pagina=$(( $(tput lines 2>/dev/null || printf '24') / 2 ))
     fi
     (( por_pagina < 6 )) && por_pagina=6
 
-    # Si el texto solo se pasa unas líneas de una pantalla, se muestra entero.
-    # Así no aparece un «-- Más --» para dos o tres líneas sueltas.
-    (( total <= por_pagina + 6 )) && por_pagina=$total
+    # Si el texto solo se pasa una o dos líneas, se muestra entero.
+    # Así no aparece un «-- Más --» para un par de líneas sueltas.
+    (( total <= por_pagina + 2 )) && por_pagina=$total
 
     while (( i < total )); do
         inicio=$i
@@ -1534,6 +1536,7 @@ Los tienes guardados en el repaso adaptativo." "Enter para volver"
 
 demo_02_salida() {
     local nombre nota interactivo=0
+    local nombre1="Carlos" edad1=25 nombre2="Sofía" edad2=30
     [[ $AUTOTEST -eq 0 && -t 0 ]] && interactivo=1
 
     printf '%s\n' "→ Vamos a usar tus datos. Escribe tu nombre y una nota."
@@ -1551,63 +1554,87 @@ demo_02_salida() {
         nota=9
     fi
 
-    printf '\n%s\n' "→ echo imprime el texto y un salto de línea:"
+    printf '\n%s\n' "→ echo imprime el texto y añade un salto de línea"
+    printf '%s\n' '  código: echo "Hola, $nombre"'
+    printf '  salida: '
     echo "Hola, $nombre"
 
-    printf '\n%s\n' "→ printf necesita \\n para el salto:"
+    printf '\n%s\n' "→ printf no añade el salto: se lo pides con \\n"
+    printf '%s\n' '  código: printf "Hola, %s\n" "$nombre"'
+    printf '  salida: '
     printf "Hola, %s\n" "$nombre"
 
-    printf '\n%s\n' "→ printf rellena los huecos por orden:"
-    printf '  printf "%%s sacó un %%d\\n" "$nombre" "$nota"\n'
+    printf '\n%s\n' "→ printf rellena sus huecos por orden"
+    printf '%s\n' '  código: printf "%s sacó un %d\n" "$nombre" "$nota"'
+    printf '  salida: '
     printf "%s sacó un %d\n" "$nombre" "$nota"
 
-    printf '\n%s\n' "→ el primer %s toma el primer valor; el %d, el segundo:"
-    printf '  primer valor: %s\n' "$nombre"
-    printf '  segundo valor: %d\n' "$nota"
-
-    printf '\n%s\n' "→ si cambias el orden de los valores, cambia el texto:"
-    printf '  printf "nota: %%d · nombre: %%s\\n" "$nota" "$nombre"\n'
+    printf '\n%s\n' "→ si cambias el orden de los valores, cambia el texto"
+    printf '%s\n' '  código: printf "nota: %d · nombre: %s\n" "$nota" "$nombre"'
+    printf '  salida: '
     printf "nota: %d · nombre: %s\n" "$nota" "$nombre"
 
-    printf '\n%s\n' "→ los mismos valores con echo:"
+    printf '\n%s\n' "→ los mismos valores con echo, que no tiene huecos"
+    printf '%s\n' '  código: echo "$nombre sacó un $nota"'
+    printf '  salida: '
     echo "$nombre sacó un $nota"
+
+    printf '\n%s\n' "→ cuatro huecos toman cuatro valores, en orden"
+    printf '%s\n' '  código: printf "%s tiene %d años y %s tiene %d años.\n" \'
+    printf '%s\n' '              "$nombre1" "$edad1" "$nombre2" "$edad2"'
+    printf '  salida: '
+    printf "%s tiene %d años y %s tiene %d años.\n" \
+        "$nombre1" "$edad1" "$nombre2" "$edad2"
 }
 
 demo_02_entrada() {
     local ciudad interactivo=0
     [[ $AUTOTEST -eq 0 && -t 0 ]] && interactivo=1
 
-    printf '%s\n' "→ read -p muestra el mensaje y lee en la misma orden:"
+    printf '%s\n' "→ read -p pide el dato y lo guarda en una variable"
+    printf '%s\n' '  código: read -r -p "¿En qué ciudad vives? " ciudad'
     if (( interactivo )); then
-        read -r -e -p "¿En qué ciudad vives? " ciudad || ciudad=""
+        read -r -e -p "  ¿En qué ciudad vives? " ciudad || ciudad=""
     else
-        printf '%s\n' "¿En qué ciudad vives? Madrid (demo)"
+        printf '%s\n' "  escribes: Madrid (demo)"
         ciudad="Madrid"
     fi
     [[ -n $ciudad ]] || ciudad="Madrid"
+    printf '  la variable ciudad vale: %s\n' "$ciudad"
+    printf '%s\n' '  código: echo "Vives en $ciudad"'
+    printf '  salida: '
     printf 'Vives en %s\n' "$ciudad"
 
-    printf '\n%s\n' "→ sin -p, el mensaje va en un echo aparte:"
-    printf '%s\n' '  echo "¿En qué ciudad vives?"'
-    printf '%s\n' '  read -r ciudad'
-    printf '%s\n' '  echo "Vives en $ciudad"'
+    printf '\n%s\n' "→ read sin -p: el mensaje va en un echo aparte"
+    printf '%s\n' '  código:'
+    printf '%s\n' '    echo "¿En qué ciudad vives?"'
+    printf '%s\n' '    read -r ciudad'
+    printf '%s\n' '    echo "Vives en $ciudad"'
+    printf '%s\n' '  La línea que escribes se guarda; read no la imprime.'
 }
 
 demo_02_codigos() {
-    local codigo interactivo=0
+    local codigo estado interactivo=0
     [[ $AUTOTEST -eq 0 && -t 0 ]] && interactivo=1
 
-    printf '%s\n' "→ true sale bien (0); false sale mal (1):"
-    true
-    printf 'true  → $? = %s\n' "$?"
-    false
-    printf 'false → $? = %s\n' "$?"
+    printf '%s\n' "→ echo termina bien y deja 0"
+    printf '%s\n' '  código: echo "hola"; echo $?'
+    printf '  salida: '
+    echo "hola"
+    printf '          $? = %s\n' "$?"
+
+    printf '\n%s\n' "→ una comparación falsa deja 1"
+    (( 5 > 10 ))
+    estado=$?
+    printf '%s\n' '  código: (( 5 > 10 )); echo $?'
+    printf '  salida: $? = %s\n' "$estado"
 
     printf '\n%s\n' "→ elige tú un código y mira qué devuelve exit:"
+    printf '%s\n' '  código: ( exit N )   dentro de un subshell'
     if (( interactivo )); then
-        read -r -e -p "Código de salida (0 a 255): " codigo || codigo=""
+        read -r -e -p "  Código de salida (0 a 255): " codigo || codigo=""
     else
-        printf '%s\n' "Código de salida (0 a 255): 3 (demo)"
+        printf '%s\n' "  escribes: 3 (demo)"
         codigo=3
     fi
     if [[ ! $codigo =~ ^[0-9]+$ ]] || (( codigo > 255 )); then
@@ -1615,37 +1642,52 @@ demo_02_codigos() {
         codigo=3
     fi
     ( exit "$codigo" )
-    printf 'un subshell con exit %s → $? = %s\n' "$codigo" "$?"
+    estado=$?
+    printf '  salida: %s\n' "$estado"
 
     printf '\n%s\n' "→ \$? cambia con cada comando:"
-    false
-    echo "esto imprime hola"
-    printf 'después de echo, $? = %s (el de echo, no el de false)\n' "$?"
+    printf '%s\n' '  código: (( 5 > 10 )); echo "hola"; echo $?'
+    (( 5 > 10 ))
+    printf '  salida: '
+    echo "hola"
+    printf '          %s   ← el 0 es de echo, no de la comparación\n' "$?"
 }
 
 demo_02_condicional() {
-    local respuesta resultado interactivo=0
+    local respuesta resultado texto interactivo=0
     [[ $AUTOTEST -eq 0 && -t 0 ]] && interactivo=1
 
-    printf '%s\n' "→ true && ... ejecuta la parte derecha:"
-    true && printf '  se imprime\n'
-    printf '%s\n' "→ false && ... no la ejecuta:"
-    false && printf '  no se imprime\n'
-    printf '%s\n' "→ false || ... ejecuta la alternativa:"
-    false || printf '  se imprime\n'
-    printf '%s\n' "→ true || ... no la ejecuta:"
-    true || printf '  no se imprime\n'
+    printf '%s\n' "→ (( 5 > 3 )) es verdad y deja 0"
+    printf '%s\n' '  código: (( 5 > 3 )) && echo "se imprime"'
+    printf '  salida: '
+    (( 5 > 3 )) && printf '%s\n' 'se imprime'
+
+    printf '\n%s\n' "→ (( 5 > 10 )) es falso: no se ejecuta la derecha"
+    printf '%s\n' '  código: (( 5 > 10 )) && echo "no se imprime"'
+    printf '%s\n' '  salida: (nada)'
+
+    printf '\n%s\n' "→ (( 5 > 10 )) es falso: se ejecuta la alternativa"
+    printf '%s\n' '  código: (( 5 > 10 )) || echo "se imprime"'
+    printf '  salida: '
+    (( 5 > 10 )) || printf '%s\n' 'se imprime'
+
+    printf '\n%s\n' "→ (( 5 > 3 )) es verdad: no se ejecuta la alternativa"
+    printf '%s\n' '  código: (( 5 > 3 )) || echo "no se imprime"'
+    printf '%s\n' '  salida: (nada)'
 
     printf '\n%s\n' "→ ahora eliges tú si la condición sale bien o mal:"
     if (( interactivo )); then
-        read -r -e -p "s = bien, n = mal: " respuesta || respuesta=""
+        read -r -e -p "  s = bien, n = mal: " respuesta || respuesta=""
     else
-        printf '%s\n' "s = bien, n = mal: s (demo)"
+        printf '%s\n' "  escribes: s (demo)"
         respuesta="s"
     fi
-    [[ $respuesta == s* || $respuesta == S* ]] && resultado=true || resultado=false
-    printf 'resultado: %s\n' "$resultado"
-    "$resultado" && printf '  bien\n' || printf '  mal\n'
+    [[ $respuesta == s* || $respuesta == S* ]] && resultado=1 || resultado=0
+    (( resultado )) && texto=verdad || texto=mentira
+    printf '  resultado: %s (%s)\n' "$resultado" "$texto"
+    printf '%s\n' '  código: (( resultado )) && echo "bien" || echo "mal"'
+    printf '  salida: '
+    (( resultado )) && printf '%s\n' 'bien' || printf '%s\n' 'mal'
 }
 
 # El self-test ejecuta demo_02; el nivel 2 llama a cada demo por separado.
@@ -1664,7 +1706,8 @@ Lee un número y di si está entre 1 y 10.
 
 DE DÓNDE SALE EL NÚMERO
 No lo escribas dentro del reto: el curso te lo da por la entrada,
-como si lo tecleara alguien. Con :probar puedes escribirlo tú.
+como si lo tecleara alguien. read -r n guarda esa línea en la
+variable n. Con :probar puedes escribirlo tú.
 
 QUÉ DEBE PASAR
   Si está entre 1 y 10 (incluidos): imprime ok y termina con 0.
@@ -1711,151 +1754,335 @@ RETOS_02=(reto_02_1)
 
 paso_02_intro() {
     pantalla "Nivel 2 · ${TITULOS[2]}" "Un script hace tres cosas: recibe datos, escribe resultados
-y dice si salió bien." ""
+y dice si salió bien.
+
+En las pantallas de teoría verás siempre dos etiquetas:
+  código   lo que escribes en el script
+  salida   lo que aparece al ejecutarlo" ""
 }
 
-paso_02_salida() {
-    pantalla "Nivel 2 · Parte 1" "Salida: echo y printf" ""
+# ---------------------------------------------------------- parte 1: salida --
+
+paso_02_stdout() {
+    pantalla "Nivel 2 · Parte 1" "Salida: stdout, código y resultado" ""
     paginar "$(cat <<'TEXTO'
-Un script escribe su resultado en la salida estándar (stdout).
-En una terminal, eso se ve en pantalla.
+Un script escribe su resultado en la salida estándar: stdout.
+En una terminal, stdout es la pantalla.
 
-echo imprime el texto y añade un salto de línea:
+código:   lo que escribes en el script
+salida:   lo que aparece al ejecutarlo
+
+código:
   echo "Hola, mundo"
-  → Hola, mundo
 
-printf imprime con formato y NO añade salto por su cuenta:
-  printf "Hola, mundo\n"
-  → Hola, mundo          (el \n es el salto de línea)
+salida:
+  Hola, mundo
 
-printf usa una plantilla con huecos. Los huecos se rellenan
-con los valores que escribes después, EN ORDEN:
-  nombre="Ada"
-  nota=9
+echo añade el salto de línea al final.
+TEXTO
+)"
+}
+
+paso_02_printf() {
+    pantalla "Nivel 2 · Parte 1" "printf: el salto lo pones tú" ""
+    paginar "$(cat <<'TEXTO'
+printf es un comando que te permite imprimir texto con un formato personalizado.
+
+printf no añade el salto de línea: se lo pides con \n.
+
+código:
+  printf "Hola\n"
+  printf "Adiós\n"
+
+salida:
+  Hola
+  Adiós
+
+El \n es la orden de saltar de línea.
+TEXTO
+)"
+}
+
+paso_02_formato() {
+    pantalla "Nivel 2 · Parte 1" "printf: huecos en orden" ""
+    paginar "$(cat <<'TEXTO'
+printf rellena sus huecos con los valores que van después,
+en el mismo orden. 
+
+Con nombre=Ada y nota=9:
+
+código:
   printf "%s sacó un %d\n" "$nombre" "$nota"
-  → Ada sacó un 9
 
-El primer hueco (%s) toma el primer valor: "$nombre" → Ada.
-El segundo hueco (%d) toma el segundo valor: "$nota" → 9.
-No imprime «la variable anterior»: cada hueco coge su valor
-por la posición que ocupa.
+salida:
+  Ada sacó un 9
 
-Otro ejemplo, ahora con dos textos:
-  printf "%s y %s\n" "Ada" "Bash"
-  → Ada y Bash
-El primer %s toma "Ada"; el segundo, "Bash".
+Cada comodín o "hueco" que pones en el texto 
+se rellena estrictamente con los valores que le pasas después, 
+de izquierda a derecha.
+TEXTO
+)"
+}
 
-Si cambias el orden de los valores, cambia el resultado:
+paso_02_formato_orden() {
+    pantalla "Nivel 2 · Parte 1" "printf: cada hueco, su valor" ""
+    paginar "$(cat <<'TEXTO'
+Los huecos toman el valor por su posición, no por su nombre.
+
+El mismo printf con los valores al revés:
+
+código:
   printf "nota: %d · nombre: %s\n" "$nota" "$nombre"
-  → nota: 9 · nombre: Ada
 
-  %s   hueco para un texto (string)
-  %d   hueco para un número entero (no %n)
+salida:
+  nota: 9 · nombre: Ada
+
+Primer hueco → primer valor; segundo hueco → segundo valor.
+TEXTO
+)"
+}
+
+paso_02_formato_varios() {
+    pantalla "Nivel 2 · Parte 1" "printf: cuatro huecos, cuatro valores" ""
+    paginar "$(cat <<'TEXTO'
+Los huecos se rellenan de izquierda a derecha, en ese mismo orden.
+
+Con nombre1=Carlos, edad1=25, nombre2=Sofía y edad2=30:
+
+código:
+  printf "%s tiene %d años y %s tiene %d años.\n" \
+      "$nombre1" "$edad1" "$nombre2" "$edad2"
+
+salida:
+  Carlos tiene 25 años y Sofía tiene 30 años.
+
+  %s → Carlos   %d → 25   %s → Sofía   %d → 30
+
+La barra \ del final solo parte la línea larga.
+TEXTO
+)"
+}
+
+paso_02_resumen_salida() {
+    pantalla "Nivel 2 · Parte 1" "Resumen: echo o printf" ""
+    paginar "$(cat <<'TEXTO'
+  %s   hueco para texto
+  %d   hueco para número entero (no %n)
   \n   salto de línea
 
-echo basta para mensajes sencillos. printf es más predecible
-cuando el texto lleva formato, saltos o varios valores.
+echo sirve para mensajes sencillos.
+printf es más predecible con formato, saltos o varios valores.
 TEXTO
 )"
 }
 
 paso_02_demo_salida() {
-    pantalla "Nivel 2 · Demo de salida" "Escribe tu nombre y una nota: verás cómo printf
-coloca cada valor en su hueco." ""
+    pantalla "Nivel 2 · Demo de salida" "Escribe tu nombre y una nota. En cada ejemplo verás
+primero el código y debajo su salida." ""
     demo_02_salida
 }
 
-paso_02_entrada() {
-    pantalla "Nivel 2 · Parte 2" "Entrada: read" ""
-    paginar "$(cat <<'TEXTO'
-La entrada estándar (stdin) es de donde el script lee datos.
-read toma una línea de ahí y la guarda en una variable.
+# --------------------------------------------------------- parte 2: entrada --
 
-  echo "¿Cómo te llamas?"
+paso_02_entrada_variable() {
+    pantalla "Nivel 2 · Parte 2" "read: lo que escribes se guarda en una variable" ""
+    paginar "$(cat <<'TEXTO'
+read toma una línea de la entrada (stdin) y la guarda
+en una variable. Lo que escribes no es la salida: es el dato.
+
+código:
+  read -r nombre
+
+Si escribes Ada y pulsas Enter, la variable nombre vale Ada.
+read no imprime nada: solo guarda.
+TEXTO
+)"
+}
+
+paso_02_entrada_ejemplo() {
+    pantalla "Nivel 2 · Parte 2" "Usar lo que has leído" ""
+    paginar "$(cat <<'TEXTO'
+Después usas la variable como cualquier otra:
+
+código:
   read -r nombre
   echo "Hola, $nombre"
 
-Al ejecutarlo e interactuar:
-  ¿Cómo te llamas?
-  Ada
+pantalla:
+  Ada            ← lo escribes tú (read no lo muestra)
+  Hola, Ada      ← lo imprime echo con el valor guardado
+
+La variable guarda el texto; $nombre lo devuelve.
+TEXTO
+)"
+}
+
+paso_02_entrada_p() {
+    pantalla "Nivel 2 · Parte 2" "read -p y -r" ""
+    paginar "$(cat <<'TEXTO'
+read -p junta el mensaje y la lectura en una línea:
+
+código:
+  read -r -p "¿Cómo te llamas? " nombre
+  echo "Hola, $nombre"
+
+pantalla:
+  ¿Cómo te llamas? Ada
   Hola, Ada
 
-read -p junta el mensaje y la lectura:
-  read -r -p "¿Cómo te llamas? " nombre
-  → ¿Cómo te llamas? Ada
-
-La opción -r evita que se coman las barras invertidas.
-En los retos, el curso puede darte la entrada ya escrita;
-con :probar puedes teclearla tú y ver el resultado.
+-r guarda el texto tal cual, sin comerse las barras invertidas.
 TEXTO
 )"
 }
 
 paso_02_demo_entrada() {
-    pantalla "Nivel 2 · Demo de entrada" "Vamos a leer una ciudad con read -p." ""
+    pantalla "Nivel 2 · Demo de entrada" "Escribe una ciudad. Verás cómo read la guarda
+en la variable y cómo echo la recupera." ""
     demo_02_entrada
 }
 
-paso_02_codigos() {
-    pantalla "Nivel 2 · Parte 3" "Códigos de salida: \$? y exit" ""
+# --------------------------------------------------------- parte 3: códigos --
+
+paso_02_codigos_que() {
+    pantalla "Nivel 2 · Parte 3" "El código de salida de cada comando" ""
     paginar "$(cat <<'TEXTO'
-Cada comando termina con un número: su código de salida.
-  0       salió bien
-  otro    hubo un problema
+Cada comando termina con un código de salida:
 
-$? guarda el código del último comando:
-  true
-  echo $?
-  → 0
+  0      salió bien
+  otro   hubo un problema
 
-  false
-  echo $?
-  → 1
+$? guarda el código del último comando. Hasta echo deja uno:
 
-exit N termina el script con ese código:
-  exit 1
-  → el script termina con código 1
-
-Ojo: cada comando cambia $?. Este echo lo pisa:
-  false
+código:
   echo "hola"
   echo $?
-  → hola
-  → 0        (el 0 es de echo, no de false)
 
-Regla de oro: un script devuelve 0 si hizo su trabajo y un código
-distinto de 0 si no pudo hacerlo.
+salida:
+  hola
+  0
+TEXTO
+)"
+}
+
+paso_02_codigos_fallo() {
+    pantalla "Nivel 2 · Parte 3" "Cuando algo falla" ""
+    paginar "$(cat <<'TEXTO'
+Una comparación falsa también deja un código distinto de 0.
+(( n > 10 )) deja 0 si es verdad y 1 si es falso.
+
+Con n=5:
+
+código:
+  n=5
+  (( n > 10 ))
+  echo $?
+
+salida:
+  1
+
+Como 5 no es mayor que 10, deja 1. (( n > 3 )) dejaría 0.
+TEXTO
+)"
+}
+
+paso_02_codigos_pisar() {
+    pantalla "Nivel 2 · Parte 3" "\$? y el último comando" ""
+    paginar "$(cat <<'TEXTO'
+Cada comando pisa $?. El 0 de este ejemplo es de echo:
+
+código:
+  n=5
+  (( n > 10 ))   # falso: deja 1
+  echo "hola"    # bien: deja 0
+  echo $?
+
+salida:
+  hola
+  0
+
+Si necesitas el código anterior, guárdalo justo después:
+  estado=$?
+TEXTO
+)"
+}
+
+paso_02_codigos_exit() {
+    pantalla "Nivel 2 · Parte 3" "exit: terminar con un código" ""
+    paginar "$(cat <<'TEXTO'
+exit N termina el script en ese momento con el código N.
+(N es un número entero)
+
+código:
+  echo "antes del comando 'exit' se ejecuta el script"
+  exit 1
+  echo "esto no llega a ejecutarse nunca"
+
+salida:
+  antes del comando 'exit' se ejecuta el script
+  (el script termina con código de error 1)
+
+Regla de oro: 0 si hizo su trabajo; otro número si falló.
 TEXTO
 )"
 }
 
 paso_02_demo_codigos() {
-    pantalla "Nivel 2 · Demo de códigos" "Elige un código de salida y mira qué devuelve exit." ""
+    pantalla "Nivel 2 · Demo de códigos" "Mira el código de echo, el de una comparación falsa
+y el de un exit que eliges tú." ""
     demo_02_codigos
 }
 
-paso_02_condicional() {
-    pantalla "Nivel 2 · Parte 4" "&& y ||: actuar según el código" ""
+# ---------------------------------------------------- parte 4: condicionales --
+
+paso_02_condicional_and() {
+    pantalla "Nivel 2 · Parte 4" "&&: actuar si salió bien" ""
     paginar "$(cat <<'TEXTO'
-&& ejecuta la parte derecha solo si la izquierda salió bien (0):
-  true && echo "sí"
-  → sí
+Con n=5, (( n > 3 )) es verdad y deja 0:
 
-  false && echo "no"
-  → (no imprime nada)
+código:
+  n=5
+  (( n > 3 )) && echo "mayor que 3"
+  (( n > 10 )) && echo "no se imprime"
 
-|| ejecuta la parte derecha solo si la izquierda falló (distinto de 0):
-  false || echo "alternativa"
-  → alternativa
+salida:
+  mayor que 3
 
-  true || echo "no"
-  → (no imprime nada)
+&& ejecuta la derecha solo si la izquierda salió bien (0).
+TEXTO
+)"
+}
 
-Se pueden combinar:
-  true && echo "bien" || echo "mal"
-  → bien
+paso_02_condicional_or() {
+    pantalla "Nivel 2 · Parte 4" "||: actuar si falló" ""
+    paginar "$(cat <<'TEXTO'
+Con n=5, (( n > 10 )) es falso y deja 1:
 
-Son atajos de un if para decisiones de una sola línea.
+código:
+  n=5
+  (( n > 10 )) || echo "no es mayor que 10"
+  (( n > 3 )) || echo "no se imprime"
+
+salida:
+  no es mayor que 10
+
+|| ejecuta la derecha solo si la izquierda falló.
+TEXTO
+)"
+}
+
+paso_02_condicional_combo() {
+    pantalla "Nivel 2 · Parte 4" "Combinar && y ||" ""
+    paginar "$(cat <<'TEXTO'
+código:
+  n=5
+  (( n > 3 )) && echo "mayor" || echo "no"
+  (( n > 10 )) && echo "mayor" || echo "no"
+
+salida:
+  mayor
+  no
+
+Son atajos de un if: la comparación decide qué rama se ejecuta.
 TEXTO
 )"
 }
@@ -1879,13 +2106,25 @@ Con :probar puedes probar con 5, 42 o abc." ""
 
 PASOS_02=(
     paso_02_intro
-    paso_02_salida
+    paso_02_stdout
+    paso_02_printf
+    paso_02_formato
+    paso_02_formato_orden
+    paso_02_formato_varios
+    paso_02_resumen_salida
     paso_02_demo_salida
-    paso_02_entrada
+    paso_02_entrada_variable
+    paso_02_entrada_ejemplo
+    paso_02_entrada_p
     paso_02_demo_entrada
-    paso_02_codigos
+    paso_02_codigos_que
+    paso_02_codigos_fallo
+    paso_02_codigos_pisar
+    paso_02_codigos_exit
     paso_02_demo_codigos
-    paso_02_condicional
+    paso_02_condicional_and
+    paso_02_condicional_or
+    paso_02_condicional_combo
     paso_02_demo_condicional
     paso_02_como_probar
 )
