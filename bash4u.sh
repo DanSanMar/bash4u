@@ -1,7 +1,7 @@
 #!/bin/bash
 # bash4u.sh — curso interactivo de Bash scripting de cero a experto.
 #
-# Fase 1: motor (pantallas, estado, etapas, validación, XP) + niveles piloto 0, 1, 2 y 4.
+# Fase 1: motor (pantallas, estado, etapas, validación, XP) + niveles piloto 0, 1, 2, 3 y 4.
 # Todo el curso vive en este archivo; ver README.md para el uso.
 #
 # Convenciones internas:
@@ -12,7 +12,7 @@
 
 set -uo pipefail
 
-VERSION="0.3.8"
+VERSION="0.4.0"
 DIR_DATOS="${XDG_DATA_HOME:-$HOME/.local/share}/bash4u"
 ARCH_ESTADO="$DIR_DATOS/estado"
 DIR_PRACTICAS="${BASH4U_PRACTICAS:-$HOME/bash4u-practicas}"
@@ -58,6 +58,9 @@ R_CASOS=()
 R_ARCHIVO=""
 R_CHEQUEO=""
 R_LOGRO=""
+R_MODO=""
+R_RESPUESTA=""
+R_UNA_LINEA=0
 DETALLE_FALLO=""
 STTY_ORIG=""
 
@@ -423,6 +426,19 @@ ejecutar_codigo() {
     local codigo=$1
     DETALLE_FALLO=""
 
+    # Reto de texto: el alumno escribe la salida y se compara tal cual.
+    if [[ $R_MODO == texto ]]; then
+        if [[ "$(normalizar "$codigo")" == "$(normalizar "$R_RESPUESTA")" ]]; then
+            return 0
+        fi
+        DETALLE_FALLO="Esperaba:
+$(printf '%s' "$R_RESPUESTA")
+
+Escribiste:
+$(printf '%s' "$codigo")"
+        return 1
+    fi
+
     if (( ${#R_CASOS[@]} == 0 )); then
         DETALLE_FALLO="el reto no define casos de prueba"
         return 1
@@ -553,6 +569,9 @@ definir_reto() {
     R_ARCHIVO=""
     R_CHEQUEO=""
     R_LOGRO=""
+    R_MODO=""
+    R_RESPUESTA=""
+    R_UNA_LINEA=0
     R_NOTA="CÓMO SE EJECUTA
 El curso ejecuta tu código con bash; no necesitas shebang ni chmod.
 Si el reto necesita datos, los pone el curso: tú escribes el código.
@@ -565,10 +584,18 @@ bucle_reto() {
     local xp=${1:-10}
     local intentos=0 max=3
     local -a lineas=()
-    local linea codigo limpia titulo guardado cuerpo
+    local linea codigo limpia titulo guardado cuerpo instrucciones
 
     titulo="Reto ${R_ID}"
     (( RETO_CUANTOS > 0 )) && titulo+=" · ${RETO_INDICE} de ${RETO_CUANTOS}"
+
+    if (( R_UNA_LINEA )); then
+        instrucciones="Escribe tu respuesta y pulsa Enter.
+Ayuda: :pista"
+    else
+        instrucciones="Escribe tu solución, una línea por vez y termina con #fin.
+Ayuda: :pista  ·  :probar  ·  :ver  ·  :borrar  ·  :cancelar"
+    fi
 
     while (( intentos < max )); do
         lineas=()
@@ -576,8 +603,7 @@ bucle_reto() {
 
 ${R_NOTA}
 
-Escribe tu solución, una línea por vez y termina con #fin.
-Ayuda: :pista  ·  :probar  ·  :ver  ·  :borrar  ·  :cancelar
+${instrucciones}
 ────────────────────────────────────────
 Atajos: Enter avanza · :atras vuelve · :inicio reinicia · :salir sale"
 
@@ -612,6 +638,10 @@ Atajos: Enter avanza · :atras vuelve · :inicio reinicia · :salir sale"
                     guardar_estado
                     continue ;;
                 ":probar"|":ejecutar")
+                    if [[ $R_MODO == texto ]]; then
+                        printf '%s\n' "Aquí no hay código que ejecutar: escribe la salida exacta."
+                        continue
+                    fi
                     if (( ${#lineas[@]} == 0 )); then
                         printf '%s\n' "Todavía no has escrito código. Escribe alguna línea y vuelve a probar."
                         continue
@@ -625,9 +655,11 @@ Atajos: Enter avanza · :atras vuelve · :inicio reinicia · :salir sale"
             esac
 
             lineas+=("$linea")
+            (( R_UNA_LINEA )) && break
         done
 
-        if (( ${#lineas[@]} == 0 )); then
+        if (( ${#lineas[@]} == 0 )) \
+            || { (( R_UNA_LINEA )) && [[ -z ${lineas[0]} ]]; }; then
             printf '%s\n' "No escribiste nada. Vuelve a intentarlo."
             pausa || true
             continue
@@ -727,6 +759,7 @@ LECCIONES=(
     "0|La terminal y tu primer script|leccion_00"
     "1|Variables y comillas|leccion_01"
     "2|Entrada, salida y códigos de estado|leccion_02"
+    "3|Decisiones: tests y condicionales|leccion_03"
     "4|Bucles y menús|leccion_04"
 )
 
@@ -1701,33 +1734,46 @@ demo_02() {
 reto_02_1() {
     definir_reto \
         "2.1" \
-        "OBJETIVO
-Lee un nombre e imprime \"Hola, \" seguido del nombre.
+        "¿QUÉ IMPRIME?
+  printf \"%s tiene %d años\\n\" \"Ada\" 9
 
-ESCRIBE
-  read -r nombre
-  printf \"Hola, %s\\n\" \"\$nombre\"
-
-EJEMPLO
-  entrada: Ada
-  salida:  Hola, Ada
-
-Escríbelas en ese orden." \
-        "read -r nombre guarda la línea en la variable nombre.
-Después, printf \"Hola, %s\\n\" \"\$nombre\" rellena el hueco %s." \
-        'read -r nombre
-printf "Hola, %s\n" "$nombre"' \
-        'echo "Hola, Ada"' \
-        '' 5 \
-        "Ada|Hola, Ada|0" \
-        "Sofía|Hola, Sofía|0"
-    R_NOTA="CÓMO SE EJECUTA
-El curso ejecuta tu código con bash; no hace falta shebang.
-Con :probar escribes tú el nombre y ves la salida."
-    R_LOGRO="Has leído una línea y la has impreso con printf en su hueco."
+Escribe la salida exacta (una línea)." \
+        "printf no lee: \"Ada\" rellena %s y 9 rellena %d. \\n salta de línea." \
+        'Ada tiene 9 años' \
+        'Ada tiene 9 años.' \
+        '' 5
+    R_MODO="texto"
+    R_UNA_LINEA=1
+    R_RESPUESTA="Ada tiene 9 años"
+    R_NOTA="CÓMO SE RESPONDE
+Escribe la salida tal cual y pulsa Enter.
+No hay que ejecutar nada: se compara el texto."
+    R_LOGRO="Has leído un printf y has escrito su salida exacta."
 }
 
-RETOS_02=(reto_02_1)
+reto_02_2() {
+    definir_reto \
+        "2.2" \
+        "ESCRIBE EL CÓDIGO
+Que imprima exactamente:
+
+  Ada tiene 9 años
+
+Una línea con echo. No escribas \\n: echo lo añade solo." \
+        "echo imprime el texto y añade el salto de línea él solo.
+No hace falta escribir \\n." \
+        'echo "Ada tiene 9 años"' \
+        'echo "Ada tiene 9"' \
+        '' 5 \
+        "|Ada tiene 9 años|0"
+    R_UNA_LINEA=1
+    R_NOTA="CÓMO SE EJECUTA
+El curso ejecuta tu línea con bash; no hace falta shebang.
+Escribe el código y pulsa Enter."
+    R_LOGRO="Has escrito un echo que produce la salida pedida."
+}
+
+RETOS_02=(reto_02_1 reto_02_2)
 
 paso_02_intro() {
     pantalla "Nivel 2 · ${TITULOS[2]}" "Un script hace tres cosas: recibe datos, escribe resultados
@@ -1776,6 +1822,46 @@ salida:
   Adiós
 
 El \n es la orden de saltar de línea.
+TEXTO
+)"
+}
+
+paso_02_printf_valores() {
+    pantalla "Nivel 2 · Parte 1" "printf no lee: rellena huecos" ""
+    paginar "$(cat <<'TEXTO'
+printf no lee del teclado: no es como read.
+read espera que escribas; printf usa lo que le das.
+
+código:
+  printf "%s tiene %d años\n" "Ada" 9
+
+salida:
+  Ada tiene 9 años
+
+%s toma "Ada"; %d toma 9.
+Los valores van después, fuera de las comillas,
+separados por espacios.
+TEXTO
+)"
+}
+
+paso_02_printf_variables() {
+    pantalla "Nivel 2 · Parte 1" "printf: literales o variables" ""
+    paginar "$(cat <<'TEXTO'
+Los valores pueden ser literales o variables.
+
+código (literal):
+  printf "%s tiene %d años\n" "Ada" 9
+
+código (variables):
+  nombre=Ada
+  edad=9
+  printf "%s tiene %d años\n" "$nombre" "$edad"
+
+salida en ambos casos:
+  Ada tiene 9 años
+
+La variable debe tener valor antes de printf.
 TEXTO
 )"
 }
@@ -2070,21 +2156,20 @@ paso_02_demo_condicional() {
 }
 
 paso_02_como_probar() {
-    pantalla "Nivel 2 · Cómo se prueban los retos" "Escribe tu código, una línea por vez, y termina con #fin.
+    pantalla "Nivel 2 · Cómo se prueban los retos" "Estos retos se responden con una sola línea.
 
-El curso lo ejecuta y compara la salida y el código de salida.
+En 2.1 ves un código y escribes su salida exacta.
+En 2.2 ves una salida y escribes el código con echo.
 
-Con :probar puedes ejecutarlo antes. Si el reto pide datos, los
-escribes tú y ves el resultado al momento.
-
-En el reto 2.1 el curso te dará el nombre; no lo escribas dentro.
-Con :probar puedes probar con Ada o Sofía." ""
+Escribe la línea y pulsa Enter; no hace falta #fin." ""
 }
 
 PASOS_02=(
     paso_02_intro
     paso_02_stdout
     paso_02_printf
+    paso_02_printf_valores
+    paso_02_printf_variables
     paso_02_formato
     paso_02_formato_orden
     paso_02_formato_varios
@@ -2115,6 +2200,274 @@ leccion_02() {
     fi
 
     pantalla "Nivel 2" "Aún quedan retos pendientes.
+Los tienes guardados en el repaso adaptativo." "Enter para volver"
+    pausa
+    return 1
+}
+
+# ------------------------------------------------------------ nivel 3 --------
+
+demo_03_tests() {
+    local nombre="Ada"
+
+    printf '%s\n' "→ test numérico verdadero"
+    printf '%s\n' '  (( 5 > 3 ))'
+    (( 5 > 3 )); printf '  código: %s\n' "$?"
+    printf '%s\n' "→ test numérico falso"
+    printf '%s\n' '  (( 5 < 3 ))'
+    (( 5 < 3 )); printf '  código: %s\n' "$?"
+    printf '%s\n' "→ test de texto verdadero"
+    printf '%s\n' '  [[ $nombre = "Ada" ]]'
+    [[ $nombre = "Ada" ]]; printf '  código: %s\n' "$?"
+    printf '%s\n' "→ test de texto falso"
+    printf '%s\n' '  [[ $nombre != "Ada" ]]'
+    [[ $nombre != "Ada" ]]; printf '  código: %s\n' "$?"
+    return 0
+}
+
+demo_03_if() {
+    local n interactivo=0
+    [[ $AUTOTEST -eq 0 && -t 0 ]] && interactivo=1
+
+    printf '%s\n' "→ Leemos un número:"
+    printf '%s\n' '  read -r n'
+    if (( interactivo )); then
+        read -r -e -p "  Escribe un número: " n || n=""
+    else
+        printf '%s\n' "  escribes: 7 (demo)"
+        n=7
+    fi
+    [[ -n $n ]] || n=7
+    if [[ ! $n =~ ^-?[0-9]+$ ]]; then
+        printf '  («%s» no es un número; uso 7)\n' "$n"
+        n=7
+    fi
+    printf '  n vale: %s\n' "$n"
+
+    printf '\n%s\n' "→ if / elif / else:"
+    printf '%s\n' '  if (( n >= 9 )); then'
+    printf '%s\n' '      echo "excelente"'
+    printf '%s\n' '  elif (( n >= 5 )); then'
+    printf '%s\n' '      echo "aprobado"'
+    printf '%s\n' '  else'
+    printf '%s\n' '      echo "suspenso"'
+    printf '%s\n' '  fi'
+    printf '  salida: '
+    if (( n >= 9 )); then
+        printf '%s\n' 'excelente'
+    elif (( n >= 5 )); then
+        printf '%s\n' 'aprobado'
+    else
+        printf '%s\n' 'suspenso'
+    fi
+    printf '%s\n' '  Solo se ejecuta una rama.'
+    return 0
+}
+
+# El self-test ejecuta demo_03; el nivel 3 llama a cada demo por separado.
+demo_03() {
+    demo_03_tests
+    demo_03_if
+}
+
+reto_03_1() {
+    definir_reto \
+        "3.1" \
+        "¿QUÉ IMPRIME?
+  n=5
+  if (( n >= 5 )); then
+      echo \"dentro\"
+  else
+      echo \"fuera\"
+  fi
+
+Escribe la salida exacta (una línea)." \
+        "n vale 5. La condición (( n >= 5 )) es verdadera." \
+        'dentro' \
+        'fuera' \
+        '' 5
+    R_MODO="texto"
+    R_UNA_LINEA=1
+    R_RESPUESTA="dentro"
+    R_NOTA="CÓMO SE RESPONDE
+Escribe la salida tal cual y pulsa Enter.
+No hay que ejecutar nada: se compara el texto."
+    R_LOGRO="Has leído un if y sabes qué rama se ejecuta."
+}
+
+reto_03_2() {
+    definir_reto \
+        "3.2" \
+        "OBJETIVO
+Lee un número con read -r n.
+Si es mayor que 3, imprime: mayor
+Si no, imprime: no
+
+Entrada 5 → mayor
+Entrada 2 → no
+
+Usa (( n > 3 )) y escribe el if completo.
+Termina con #fin." \
+        "read -r n
+if (( n > 3 )); then
+    echo \"mayor\"
+else
+    echo \"no\"
+fi" \
+        'read -r n
+if (( n > 3 )); then
+    echo "mayor"
+else
+    echo "no"
+fi' \
+        'read -r n
+echo "mayor"' \
+        '' 5 \
+        "5|mayor|0" \
+        "2|no|0" \
+        "3|no|0"
+    R_LOGRO="Has escrito un if/else que decide según el número."
+}
+
+RETOS_03=(reto_03_1 reto_03_2)
+
+paso_03_intro() {
+    pantalla "Nivel 3 · ${TITULOS[3]}" "Un test es una pregunta que responde sí (0) o no (1).
+if elige qué bloque se ejecuta según esa respuesta." ""
+}
+
+paso_03_test_numeros() {
+    pantalla "Nivel 3 · Parte 1" "0 = verdad · 1 = falso" ""
+    paginar "$(cat <<'TEXTO'
+Dentro de (( )) se comparan números.
+
+código:
+  (( 5 > 3 ))
+  echo $?
+  (( 5 < 3 ))
+  echo $?
+
+salida:
+  0
+  1
+
+Operadores: >  >=  <  <=  ==  !=
+TEXTO
+)"
+}
+
+paso_03_test_texto() {
+    pantalla "Nivel 3 · Parte 1" "Texto: = y != (con espacios)" ""
+    paginar "$(cat <<'TEXTO'
+El texto se compara dentro de [[ ]].
+
+código:
+  nombre=Ada
+  [[ $nombre = "Ada" ]]
+  echo $?
+  [[ $nombre != "Ada" ]]
+  echo $?
+
+salida:
+  0
+  1
+TEXTO
+)"
+}
+
+paso_03_if_sintaxis() {
+    pantalla "Nivel 3 · Parte 2" "if: si es verdad, haz esto" ""
+    paginar "$(cat <<'TEXTO'
+código:
+  n=5
+  if (( n > 3 )); then
+      echo "mayor"
+  fi
+
+salida:
+  mayor
+
+then abre el bloque; fi lo cierra.
+Dentro van 4 espacios para leerlo mejor.
+TEXTO
+)"
+}
+
+paso_03_if_else() {
+    pantalla "Nivel 3 · Parte 2" "else: el otro camino" ""
+    paginar "$(cat <<'TEXTO'
+código:
+  n=2
+  if (( n > 3 )); then
+      echo "mayor"
+  else
+      echo "no"
+  fi
+
+salida:
+  no
+
+Solo se ejecuta una de las dos ramas.
+TEXTO
+)"
+}
+
+paso_03_if_elif() {
+    pantalla "Nivel 3 · Parte 2" "elif: se para en la primera verdad" ""
+    paginar "$(cat <<'TEXTO'
+código:
+  nota=7
+  if (( nota >= 9 )); then
+      echo "excelente"
+  elif (( nota >= 5 )); then
+      echo "aprobado"
+  else
+      echo "suspenso"
+  fi
+
+salida:
+  aprobado
+TEXTO
+)"
+}
+
+paso_03_demo_tests() {
+    pantalla "Nivel 3 · Demo de tests" "Mira el código 0/1 que deja cada comparación." ""
+    demo_03_tests
+}
+
+paso_03_demo_if() {
+    pantalla "Nivel 3 · Demo de if" "Escribe un número y mira qué rama se ejecuta." ""
+    demo_03_if
+}
+
+paso_03_como_probar() {
+    pantalla "Nivel 3 · Cómo se prueban los retos" "3.1: lees un if y escribes su salida (una línea).
+3.2: escribes un if completo, línea por línea.
+Termina con #fin; :pista te enseña la estructura." ""
+}
+
+PASOS_03=(
+    paso_03_intro
+    paso_03_test_numeros
+    paso_03_test_texto
+    paso_03_if_sintaxis
+    paso_03_if_else
+    paso_03_if_elif
+    paso_03_demo_tests
+    paso_03_demo_if
+    paso_03_como_probar
+)
+
+leccion_03() {
+    recorrer_pasos PASOS_03 || return 1
+
+    if ejecutar_retos_de 3; then
+        finalizar_leccion 3
+        return 0
+    fi
+
+    pantalla "Nivel 3" "Aún quedan retos pendientes.
 Los tienes guardados en el repaso adaptativo." "Enter para volver"
     pausa
     return 1
@@ -2368,7 +2721,7 @@ menu_principal() {
         pantalla "bash4u · elige un nivel" "$(listado_menu)
 
 ${C_GRIS}r) repaso adaptativo ($(contar_pendientes) pendientes)   c) chuletas   q) salir
-Dentro de una lección: Enter avanza · :atras vuelve · :inicio reinicia · :salir sale.${C_RESET}" "Los niveles 2 y 4 son los pilotos de la Fase 1."
+Dentro de una lección: Enter avanza · :atras vuelve · :inicio reinicia · :salir sale.${C_RESET}" "Los niveles 0 a 4 son los pilotos de la Fase 1."
 
         printf '%s' "${C_PROMPT}Opción: ${C_RESET}"
         if ! IFS= read -r opcion; then
