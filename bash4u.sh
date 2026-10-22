@@ -1702,52 +1702,29 @@ reto_02_1() {
     definir_reto \
         "2.1" \
         "OBJETIVO
-Lee un número y di si está entre 1 y 10.
+Lee un nombre e imprime \"Hola, \" seguido del nombre.
 
-DE DÓNDE SALE EL NÚMERO
-No lo escribas dentro del reto: el curso te lo da por la entrada,
-como si lo tecleara alguien. read -r n guarda esa línea en la
-variable n. Con :probar puedes escribirlo tú.
+ESCRIBE
+  read -r nombre
+  printf \"Hola, %s\\n\" \"\$nombre\"
 
-QUÉ DEBE PASAR
-  Si está entre 1 y 10 (incluidos): imprime ok y termina con 0.
-  Si no: imprime fuera de rango y termina con 1.
+EJEMPLO
+  entrada: Ada
+  salida:  Hola, Ada
 
-PASO A PASO
-  1. Lee el número y guárdalo en n:
-       read -r n
-  2. Comprueba que es un número y que está en el rango. Un if sirve:
-       if [[ \$n =~ ^[0-9]+\$ ]] && (( n >= 1 && n <= 10 )); then
-         echo ok
-       else
-         echo \"fuera de rango\"
-         exit 1
-       fi
-
-EJEMPLOS
-  entrada 5   → ok             (código 0)
-  entrada 42  → fuera de rango (código 1)
-  entrada abc → fuera de rango (código 1)
-
-El if lo verás a fondo en el nivel 3; aquí basta con usarlo tal cual.
-Un valor no numérico, el cero y los negativos cuentan como fuera." \
-        "Lee con read -r n. Comprueba con [[ \$n =~ ^[0-9]+\$ ]] y (( n >= 1 && n <= 10 )).
-Si no se cumple, imprime fuera de rango y usa exit 1." \
-        'read -r n
-if [[ $n =~ ^[0-9]+$ ]] && (( n >= 1 && n <= 10 )); then
-  echo ok
-else
-  echo "fuera de rango"
-  exit 1
-fi' \
-        'read -r n
-echo ok' \
+Escríbelas en ese orden." \
+        "read -r nombre guarda la línea en la variable nombre.
+Después, printf \"Hola, %s\\n\" \"\$nombre\" rellena el hueco %s." \
+        'read -r nombre
+printf "Hola, %s\n" "$nombre"' \
+        'echo "Hola, Ada"' \
         '' 5 \
-        "5|ok|0" \
-        "42|fuera de rango|1" \
-        "abc|fuera de rango|1" \
-        "0|fuera de rango|1"
-    R_LOGRO="Has leído un número, lo has comprobado y has devuelto el código correcto."
+        "Ada|Hola, Ada|0" \
+        "Sofía|Hola, Sofía|0"
+    R_NOTA="CÓMO SE EJECUTA
+El curso ejecuta tu código con bash; no hace falta shebang.
+Con :probar escribes tú el nombre y ves la salida."
+    R_LOGRO="Has leído una línea y la has impreso con printf en su hueco."
 }
 
 RETOS_02=(reto_02_1)
@@ -2100,8 +2077,8 @@ El curso lo ejecuta y compara la salida y el código de salida.
 Con :probar puedes ejecutarlo antes. Si el reto pide datos, los
 escribes tú y ves el resultado al momento.
 
-En el reto 2.1 el curso te dará el número; no lo escribas dentro.
-Con :probar puedes probar con 5, 42 o abc." ""
+En el reto 2.1 el curso te dará el nombre; no lo escribas dentro.
+Con :probar puedes probar con Ada o Sofía." ""
 }
 
 PASOS_02=(
