@@ -12,7 +12,7 @@
 
 set -uo pipefail
 
-VERSION="0.4.1"
+VERSION="0.5.0"
 DIR_DATOS="${XDG_DATA_HOME:-$HOME/.local/share}/bash4u"
 ARCH_ESTADO="$DIR_DATOS/estado"
 DIR_PRACTICAS="${BASH4U_PRACTICAS:-$HOME/bash4u-practicas}"
@@ -581,6 +581,7 @@ definir_reto() {
     R_NOTA="CÓMO SE EJECUTA
 El curso ejecuta tu código con bash; no necesitas shebang ni chmod.
 Si el reto necesita datos, los pone el curso: tú escribes el código.
+No hace falta copiar la solución: cuenta la salida y el código de salida.
 Con :probar puedes ejecutarlo tú y ver el resultado al momento."
     shift 7
     R_CASOS=("$@")
@@ -591,25 +592,43 @@ bucle_reto() {
     local intentos=0 max=3
     local -a lineas=()
     local linea codigo limpia titulo guardado cuerpo instrucciones
+    local aviso_retry aviso_pantalla pie etiqueta cuerpo_fallo codigo_anterior nota_ref
+    local n l num nueva
 
     titulo="Reto ${R_ID}"
     (( RETO_CUANTOS > 0 )) && titulo+=" · ${RETO_INDICE} de ${RETO_CUANTOS}"
 
+    codigo_anterior=""
+
     if (( R_UNA_LINEA )); then
         instrucciones="Escribe tu respuesta y pulsa Enter.
-Ayuda: :pista"
+Ayuda: :pista · :comparar · :solucion · :cancelar"
     else
         instrucciones="Escribe tu solución, una línea por vez y termina con #fin.
-Ayuda: :pista  ·  :probar  ·  :ver  ·  :borrar  ·  :cancelar"
+Ayuda: :pista · :probar · :ver · :editar N
+       :borrar · :comparar · :solucion · :cancelar"
     fi
 
     while (( intentos < max )); do
-        lineas=()
+        aviso_retry=""
+        if (( R_UNA_LINEA )); then
+            lineas=()
+            (( intentos > 0 )) && aviso_retry="Tu respuesta anterior no está cargada. Usa :comparar para verla."
+        elif (( intentos > 0 && ${#lineas[@]} > 0 )); then
+            if [[ $R_MODO == texto ]]; then
+                aviso_retry="Tu respuesta anterior sigue cargada. Usa :ver, :editar N o :borrar; :comparar muestra la referencia."
+            else
+                aviso_retry="Tu código anterior sigue cargado. Usa :ver, :editar N o :borrar; :comparar muestra la referencia."
+            fi
+        fi
+        aviso_pantalla=""
+        [[ -n $aviso_retry ]] && aviso_pantalla="${aviso_retry}"$'\n\n'
+
         pantalla "$titulo" "${R_ENUNCIADO}
 
 ${R_NOTA}
 
-${instrucciones}
+${aviso_pantalla}${instrucciones}
 ────────────────────────────────────────
 Atajos: Enter avanza · :atras vuelve · :inicio reinicia · :salir sale"
 
@@ -629,9 +648,34 @@ Atajos: Enter avanza · :atras vuelve · :inicio reinicia · :salir sale"
                 "# fin"|"#fin") break ;;
                 ":ver")
                     if (( ${#lineas[@]} )); then
-                        printf '%s\n' "${lineas[@]}"
+                        n=1
+                        for l in "${lineas[@]}"; do
+                            printf '%2d  %s\n' "$n" "$l"
+                            n=$((n + 1))
+                        done
                     else
                         printf '%s\n' "(vacío)"
+                    fi
+                    continue ;;
+                ":editar"|":editar "*)
+                    num=${limpia#:editar}
+                    num=${num#"${num%%[![:space:]]*}"}
+                    if [[ ! $num =~ ^[0-9]+$ ]]; then
+                        printf '%s\n' "Uso: :editar N (mira los números con :ver)."
+                        continue
+                    fi
+                    num=$((10#$num))
+                    if (( num >= 1 && num <= ${#lineas[@]} )); then
+                        printf '%s' "Nueva línea ${num}: "
+                        if ! IFS= read -r -e nueva; then
+                            printf '\n'
+                            printf '%s\n' "Entrada cerrada; reto cancelado."
+                            return 1
+                        fi
+                        lineas[$((num - 1))]=$nueva
+                        printf '%s\n' "Línea ${num} actualizada."
+                    else
+                        printf '%s\n' "Uso: :editar N (mira los números con :ver)."
                     fi
                     continue ;;
                 ":borrar")
@@ -654,6 +698,44 @@ Atajos: Enter avanza · :atras vuelve · :inicio reinicia · :salir sale"
                     fi
                     codigo=$(printf '%s\n' "${lineas[@]}")
                     probar_codigo "$codigo"
+                    continue ;;
+                ":comparar")
+                    if (( intentos == 0 )); then
+                        printf '%s\n' "Primero prueba tu solución. Si falla, podrás comparar con la referencia."
+                        continue
+                    fi
+                    if [[ $R_MODO == texto ]]; then
+                        printf '%s\n' "Tu respuesta:"
+                    else
+                        printf '%s\n' "Tu código:"
+                    fi
+                    if (( ${#lineas[@]} )); then
+                        printf '%s\n' "${lineas[@]}"
+                    elif [[ -n $codigo_anterior ]]; then
+                        printf '%s\n' "$codigo_anterior"
+                    else
+                        printf '%s\n' "(vacío)"
+                    fi
+                    printf '%s\n' "Solución de referencia:"
+                    printf '%s\n' "$R_SOLUCION"
+                    if [[ $R_MODO == texto ]]; then
+                        printf '%s\n' "Tu respuesta puede ser distinta: se compara el texto."
+                    else
+                        printf '%s\n' "Tu código puede ser distinto: cuenta el resultado."
+                    fi
+                    continue ;;
+                ":solucion")
+                    if (( intentos == 0 )); then
+                        printf '%s\n' "Primero prueba tu solución. Si falla, podrás ver la referencia."
+                    else
+                        printf '%s\n' "Solución de referencia:"
+                        printf '%s\n' "$R_SOLUCION"
+                        if [[ $R_MODO == texto ]]; then
+                            printf '%s\n' "No hace falta copiarla: se compara el texto."
+                        else
+                            printf '%s\n' "No hace falta copiarla: cuenta el resultado."
+                        fi
+                    fi
                     continue ;;
                 ":cancelar")
                     printf '%s\n' "Reto cancelado."
@@ -708,17 +790,42 @@ Atajos: Enter avanza · :atras vuelve · :inicio reinicia · :salir sale"
             return 0
         fi
 
+        codigo_anterior=$codigo
         intentos=$((intentos + 1))
+        etiqueta="Tu código"
+        [[ $R_MODO == texto ]] && etiqueta="Tu respuesta"
+        if [[ $R_MODO == texto ]]; then
+            cuerpo_fallo="${DETALLE_FALLO}
+
+Pista: ${R_PISTA}"
+        else
+            cuerpo_fallo="${DETALLE_FALLO}
+
+${etiqueta}:
+${codigo}
+
+Pista: ${R_PISTA}"
+        fi
+
         if (( intentos < max )); then
-            pantalla "Reto ${R_ID} · todavía no" "${DETALLE_FALLO}" \
-                "Intento ${intentos} de ${max} · Enter para reintentar"
+            pie="Intento ${intentos} de ${max} · Enter para reintentar"
+            if (( R_UNA_LINEA )); then
+                pie+=" (usa :comparar para ver tu respuesta)"
+            else
+                pie+=" (tu código sigue cargado)"
+            fi
+            pantalla "Reto ${R_ID} · todavía no" "$cuerpo_fallo" "$pie"
             pausa || true
         else
-            pantalla "Reto ${R_ID} · sin intentos" "${DETALLE_FALLO}
+            nota_ref="No hace falta copiarla: cuenta el resultado."
+            [[ $R_MODO == texto ]] && nota_ref="No hace falta copiarla: se compara el texto."
+            pantalla "Reto ${R_ID} · sin intentos" "${cuerpo_fallo}
 
 Solución de referencia:
 
-${R_SOLUCION}" "Enter para continuar"
+${R_SOLUCION}
+
+${nota_ref}" "Enter para continuar"
             pausa || true
         fi
     done
@@ -2645,97 +2752,143 @@ Los tienes guardados en el repaso adaptativo." "Enter para volver"
 
 # ------------------------------------------------------------ nivel 4 --------
 
-demo_04() {
+demo_04_bucles() {
     printf '%s\n' "→ for sobre una lista"
+    printf '%s\n' '  código: for fruta in manzana pera; do echo "$fruta"; done'
     local fruta
     for fruta in manzana pera; do
         printf '  %s\n' "$fruta"
     done
 
-    printf '%s\n' "→ for sobre un rango"
+    printf '\n%s\n' "→ for sobre un rango"
+    printf '%s\n' '  código: for i in {1..3}; do echo "$i"; done'
     local i
     for i in {1..3}; do
         printf '  %s\n' "$i"
     done
 
-    printf '%s\n' "→ while con contador"
+    printf '\n%s\n' "→ while con contador"
+    printf '%s\n' '  código: n=0; while (( n < 3 )); do n=$((n+1)); echo "$n"; done'
     local n=0
     while (( n < 3 )); do
         n=$((n + 1))
         printf '  vuelta %s\n' "$n"
     done
 
-    printf '%s\n' "→ until (hasta que se cumpla)"
+    printf '\n%s\n' "→ until: hasta que se cumpla"
+    printf '%s\n' '  código: n=0; until (( n >= 3 )); do n=$((n+1)); echo "$n"; done'
     n=0
-    until (( n >= 2 )); do
+    until (( n >= 3 )); do
         n=$((n + 1))
         printf '  hasta %s\n' "$n"
     done
 
-    printf '%s\n' "→ read en bucle"
-    local linea
-    while IFS= read -r linea; do
-        printf '  leído: %s\n' "$linea"
-    done <<'EOF'
-uno
-dos
-EOF
+    printf '\n%s\n' "→ break: corta el bucle al llegar a 3"
+    printf '%s\n' '  código: for i in 1 2 3 4 5; do (( i == 3 )) && break; echo "$i"; done'
+    for i in 1 2 3 4 5; do
+        (( i == 3 )) && break
+        printf '  %s\n' "$i"
+    done
 
-    printf '%s\n' "→ case"
-    local opcion=2
-    case $opcion in
-        1) printf '  uno\n' ;;
-        2) printf '  dos\n' ;;
-        *) printf '  otro\n' ;;
-    esac
+    printf '\n%s\n' "→ continue: se salta el 3 y sigue"
+    printf '%s\n' '  código: for i in 1 2 3 4 5; do (( i == 3 )) && continue; echo "$i"; done'
+    for i in 1 2 3 4 5; do
+        (( i == 3 )) && continue
+        printf '  %s\n' "$i"
+    done
+}
+
+demo_04_menu() {
+    local opcion interactivo=0
+    [[ $AUTOTEST -eq 0 && -t 0 ]] && interactivo=1
+
+    printf '%s\n' "→ menú con while, read, case y break"
+    printf '%s\n' '  código: while true; do read -r opcion || break; case ... esac; done'
+    if (( interactivo )); then
+        printf '%s\n' "  Escribe 1, 2, 3 o 9; 3 para salir."
+        while true; do
+            printf '%s\n' "  1) saludar" "  2) despedir" "  3) salir"
+            read -r opcion || break
+            case $opcion in
+                1) printf '%s\n' "  hola" ;;
+                2) printf '%s\n' "  adios" ;;
+                3) printf '%s\n' "  fin"; break ;;
+                *) printf '%s\n' "  opcion invalida" ;;
+            esac
+        done
+    else
+        printf '%s\n' "  (entrada simulada: 1, 9, 3)"
+        printf '1\n9\n3\n' | {
+            while true; do
+                printf '%s\n' "  1) saludar" "  2) despedir" "  3) salir"
+                read -r opcion || break
+                case $opcion in
+                    1) printf '%s\n' "  hola" ;;
+                    2) printf '%s\n' "  adios" ;;
+                    3) printf '%s\n' "  fin"; break ;;
+                    *) printf '%s\n' "  opcion invalida" ;;
+                esac
+            done
+        }
+    fi
+}
+
+demo_04() {
+    demo_04_bucles
+    demo_04_menu
+    return 0
 }
 
 reto_04_1() {
     definir_reto \
         "4.1" \
         "OBJETIVO
-Repite una acción con un bucle for.
-Imprime los números del 1 al 5, uno por línea, en orden ascendente.
+Recorre los números del 1 al 5 con un for.
+Imprime cada número, excepto el 3.
+Usa continue para saltarte el 3.
 
 SALIDA ESPERADA
 1
 2
-3
 4
 5" \
-        "Un for con {1..5} y echo dentro del bucle." \
+        "Puedes usar {1..5} o la lista 1 2 3 4 5; las llaves no son obligatorias.
+Dentro del for, comprueba si i es 3 y usa continue antes del echo." \
+        'for i in {1..5}; do
+  if (( i == 3 )); then
+    continue
+  fi
+  echo "$i"
+done' \
         'for i in {1..5}; do
   echo "$i"
 done' \
-        'echo 1 2 3 4 5' \
         '' 5 \
         "|1
 2
-3
 4
 5|0"
-    R_LOGRO="Has recorrido un rango con for."
+    R_LOGRO="Has usado continue para saltarte una vuelta del for."
 }
 
 reto_04_2() {
     definir_reto \
         "4.2" \
         "OBJETIVO
-Escribe un menú que se repita hasta que se elija la opción 3.
-Es la forma habitual de usar read dentro de un bucle.
+Monta un menú que se repita hasta la opción 3.
 
-En cada vuelta debe imprimir:
+En cada vuelta imprime:
 1) saludar
 2) despedir
 3) salir
 
-Después lee la opción con read -r y actúa así:
-  1 → imprime: hola
-  2 → imprime: adios
-  3 → imprime: fin  y termina con código 0
-  otra → imprime: opcion invalida
+Acciones:
+1 → hola
+2 → adios
+3 → fin y salir (código 0)
+otra → opcion invalida
 
-Si la entrada se acaba (EOF), termina también con código 0." \
+Si la entrada se acaba (EOF), sal también con código 0." \
         "while true; do ... case \$opcion in ... 3) break ;; esac; done
 Recuerda: read devuelve error en EOF; añade || break." \
         'while true; do
@@ -2750,16 +2903,19 @@ Recuerda: read devuelve error en EOF; añade || break." \
     *) echo "opcion invalida" ;;
   esac
 done' \
-        'echo "1) saludar"
-echo "2) despedir"
-echo "3) salir"
-read -r opcion
-case $opcion in
-  1) echo "hola" ;;
-  2) echo "adios" ;;
-  3) echo "fin" ;;
-esac' \
-        '' 5 \
+        'while true; do
+  echo "1) saludar"
+  echo "2) despedir"
+  echo "3) salir"
+  read -r opcion
+  case $opcion in
+    1) echo "hola" ;;
+    2) echo "adios" ;;
+    3) echo "fin"; break ;;
+    *) echo "opcion invalida" ;;
+  esac
+done' \
+        '' 2 \
         "1
 2
 3|1) saludar
@@ -2782,41 +2938,353 @@ opcion invalida
 1) saludar
 2) despedir
 3) salir
-fin|0"
-    R_LOGRO="Has usado read dentro de un bucle para construir un menú."
+fin|0" \
+        "1
+2|1) saludar
+2) despedir
+3) salir
+hola
+1) saludar
+2) despedir
+3) salir
+adios
+1) saludar
+2) despedir
+3) salir|0"
+    R_NOTA="CÓMO SE EJECUTA
+El curso ejecuta tu código con bash; no necesitas shebang ni chmod.
+La entrada del menú la pone el curso: tú escribes el código.
+Se prueba con entradas válidas, inválidas y con una que se acaba (EOF):
+read devuelve error al llegar al final; read -r opcion || break sale del bucle.
+No hace falta copiar la solución: cuenta la salida y el código de salida.
+Con :probar puedes ejecutarlo tú y ver el resultado al momento."
+    R_LOGRO="Has construido un menú con read, case y break, y sale al llegar a EOF."
 }
 
 RETOS_04=(reto_04_1 reto_04_2)
 
 paso_04_intro() {
-    pantalla "Nivel 4 · ${TITULOS[4]}" "Los bucles repiten trabajo y case elige entre opciones." ""
+    pantalla "Nivel 4 · ${TITULOS[4]}" "Un bucle repite un bloque de órdenes sin escribirlo otra vez.
+Sin bucle, para imprimir 1, 2 y 3 escribirías:
+  echo 1; echo 2; echo 3
+Con un bucle escribes el echo una vez y cambias el valor.
+
+Sirve para recorrer una lista, contar hasta un límite o
+repetir un menú hasta que elijas salir.
+
+En este nivel verás:
+  for       recorrer una lista o un rango
+  while     repetir mientras una condición sea verdad
+  until     repetir hasta que una condición sea verdad
+  break     salir del bucle
+  continue  saltar a la siguiente vuelta
+  read      leer datos dentro del bucle
+  case      elegir una rama, como un if múltiple
+
+Al final montarás un menú como el que usa el propio curso.
+Cuando veas código, puedes probarlo en otra terminal." ""
 }
 
-paso_04_teoria() {
-    pantalla "Nivel 4 · Teoría" "Bucles y menús" ""
-    paginar "Los bucles repiten trabajo y case elige entre opciones.
+paso_04_sintaxis() {
+    pantalla "Nivel 4 · Parte 1" "La forma de un bucle: cabecera; do ... done" ""
+    paginar "$(cat <<'TEXTO'
+Los tres bucles tienen la misma estructura:
 
-• for x in lista; do ...; done        recorre elementos.
-• for i in {1..5}; do ...; done       recorre un rango.
-• while condicion; do ...; done       repite mientras sea cierta.
-• until condicion; do ...; done       repite hasta que sea cierta.
-• break / continue                    sale del bucle / salta a la siguiente vuelta.
-• case \$x in patron) ... ;; esac      elige una rama, como un if múltiple.
+  for ...; do
+      comandos
+  done
+  while ...; do
+      comandos
+  done
+  until ...; do
+      comandos
+  done
 
+El ; antes de do separa la cabecera del bloque,
+igual que ; then en el if.
+Si pones do en otra línea, el ; no hace falta:
+  for i in 1 2 3
+  do
+      echo "$i"
+  done
+
+La indentación no es obligatoria; se usa para leer mejor.
+TEXTO
+)"
+}
+
+paso_04_for_lista() {
+    pantalla "Nivel 4 · Parte 1" "for: recorrer una lista" ""
+    paginar "$(cat <<'TEXTO'
+for recorre los elementos de una lista, uno por uno.
+
+código:
+  for fruta in manzana pera uva; do
+      echo "$fruta"
+  done
+
+salida:
+  manzana
+  pera
+  uva
+
+En cada vuelta, fruta toma el siguiente valor de la lista.
+El bloque que se repite va entre do y done.
+TEXTO
+)"
+}
+
+paso_04_for_rango() {
+    pantalla "Nivel 4 · Parte 1" "for: recorrer un rango" ""
+    paginar "$(cat <<'TEXTO'
+{1..5} crea el rango 1 2 3 4 5.
+
+código:
+  for i in {1..5}; do
+      echo "vuelta $i"
+  done
+
+salida:
+  vuelta 1
+  vuelta 2
+  vuelta 3
+  vuelta 4
+  vuelta 5
+
+También valen {a..c} y {5..1} (cuenta atrás).
+i es una variable normal; puedes usar otro nombre.
+TEXTO
+)"
+}
+
+paso_04_while() {
+    pantalla "Nivel 4 · Parte 1" "while: repetir mientras sea verdad" ""
+    paginar "$(cat <<'TEXTO'
+while comprueba la condición antes de cada vuelta.
+Si es verdad (código 0), ejecuta el bloque; si no, termina.
+
+código:
+  n=0
+  while (( n < 3 )); do
+      n=$((n + 1))
+      echo "vuelta $n"
+  done
+
+salida:
+  vuelta 1
+  vuelta 2
+  vuelta 3
+
+La condición debe cambiar dentro del bucle.
+Si n no cambia, el while no termina nunca.
+TEXTO
+)"
+}
+
+paso_04_until() {
+    pantalla "Nivel 4 · Parte 1" "until: repetir hasta que sea verdad" ""
+    paginar "$(cat <<'TEXTO'
+until es el espejo de while: repite mientras la condición
+sea falsa, y para cuando se hace verdad.
+
+código:
+  n=0
+  until (( n >= 3 )); do
+      n=$((n + 1))
+      echo "hasta $n"
+  done
+
+salida:
+  hasta 1
+  hasta 2
+  hasta 3
+
+while (( n < 3 )) y until (( n >= 3 )) hacen lo mismo aquí.
+until se lee «hasta que».
+TEXTO
+)"
+}
+
+paso_04_break() {
+    pantalla "Nivel 4 · Parte 2" "break: salir del bucle" ""
+    paginar "$(cat <<'TEXTO'
+break sale del bucle inmediatamente.
+
+código:
+  for i in 1 2 3 4 5; do
+      if (( i == 3 )); then
+          break
+      fi
+      echo "$i"
+  done
+
+salida:
+  1
+  2
+
+Cuando i llega a 3, break corta el for: 4 y 5 ya no se ejecutan.
+break solo sale del bucle más cercano.
+TEXTO
+)"
+}
+
+paso_04_continue() {
+    pantalla "Nivel 4 · Parte 2" "continue: saltar una vuelta" ""
+    paginar "$(cat <<'TEXTO'
+continue salta al final de esta vuelta y empieza la siguiente.
+
+código:
+  for i in 1 2 3 4 5; do
+      if (( i == 3 )); then
+          continue
+      fi
+      echo "$i"
+  done
+
+salida:
+  1
+  2
+  4
+  5
+
+Con i=3, continue no ejecuta el echo, pero el bucle sigue.
+No sale del bucle: solo se salta esa vuelta.
+break y continue funcionan igual en for, while y until.
+TEXTO
+)"
+}
+
+paso_04_eof() {
+    pantalla "Nivel 4 · Parte 3" "EOF: cuando la entrada se acaba" ""
+    paginar "$(cat <<'TEXTO'
+Un menú repite read para pedir una opción en cada vuelta.
+Cuando no quedan más líneas, llega EOF: end of file.
+
+EOF no es una línea vacía: es que ya no queda nada que leer.
+En una terminal, se envía con Ctrl+D.
+Si la entrada viene de un archivo o de otro comando, EOF
+llega cuando se acaban los datos. En el reto del menú, la
+entrada funciona igual: al acabarse, read recibe EOF.
+TEXTO
+)"
+}
+
+paso_04_eof_bucle() {
+    pantalla "Nivel 4 · Parte 3" "El peligro de while true sin mirar read" ""
+    paginar "$(cat <<'TEXTO'
+El problema: while true no mira el resultado de read.
+
+Cuidado con este menú:
+  while true; do
+      echo "1) saludar  2) salir"
+      read -r opcion
+      [[ $opcion == 2 ]] && break
+  done
+
+Si la entrada se acaba, read falla y el bucle vuelve a
+empezar: se queda girando sin fin.
+
+La solución: comprobar read y salir si falla.
+  read -r opcion || break
+
+|| significa: si read falla, ejecuta break.
+Regla práctica: en un menú con read, usa siempre || break.
+TEXTO
+)"
+}
+
+paso_04_case() {
+    pantalla "Nivel 4 · Parte 4" "case: elegir una rama" ""
+    paginar "$(cat <<'TEXTO'
+case elige una rama comparando texto, como un if múltiple.
+
+código:
+  opcion=2
+  case $opcion in
+      1) echo "hola" ;;
+      2) echo "adios" ;;
+      3) echo "fin" ;;
+      *) echo "opcion invalida" ;;
+  esac
+
+salida:
+  adios
+
+Cada patrón termina en ) y cada rama en ;;.
+*) es la rama por defecto: entra si no coincide ninguna.
+case compara texto; no evalúa números.
+TEXTO
+)"
+}
+
+paso_04_menu() {
+    pantalla "Nivel 4 · Parte 4" "El menú: while true + read + case" ""
+    paginar "$(cat <<'TEXTO'
 Un menú es un while true que solo termina con break.
-Cuidado: si la entrada se acaba (EOF), read falla y el bucle puede girar sin fin.
-En un menú real, comprueba el resultado de read."
+
+código:
+  while true; do
+      echo "1) saludar"
+      echo "2) despedir"
+      echo "3) salir"
+      read -r opcion || break
+      case $opcion in
+          1) echo "hola" ;;
+          2) echo "adios" ;;
+          3) echo "fin"; break ;;
+          *) echo "opcion invalida" ;;
+      esac
+  done
+
+salida (el menú se repite; aquí solo las acciones):
+  hola
+  adios
+  fin
+
+El break de la opción 3 sale del while, no del case.
+read ... || break cierra el menú si la entrada se acaba.
+TEXTO
+)"
 }
 
-paso_04_demo() {
-    pantalla "Nivel 4 · Demo" "Mira for, while, until, read en bucle y case." ""
-    demo_04
+paso_04_demo_bucles() {
+    pantalla "Nivel 4 · Demo de bucles" "Mira for, while, until, break y continue." ""
+    demo_04_bucles
+}
+
+paso_04_demo_menu() {
+    pantalla "Nivel 4 · Demo de menú" "Elige opciones y mira cómo read, case y break
+construyen un menú." ""
+    demo_04_menu
+}
+
+paso_04_como_probar() {
+    pantalla "Nivel 4 · Cómo se prueban los retos" "4.1: recorres 1..5 y te saltas el 3 con continue.
+4.2: montas un menú con while, read, case y break.
+
+El curso prueba el menú también con una entrada que se
+acaba (EOF): read falla y tu script debe salir con || break.
+
+Termina con #fin; :pista te enseña la estructura.
+Si dudas, abre otra terminal y prueba el código antes de responder." ""
 }
 
 PASOS_04=(
     paso_04_intro
-    paso_04_teoria
-    paso_04_demo
+    paso_04_sintaxis
+    paso_04_for_lista
+    paso_04_for_rango
+    paso_04_while
+    paso_04_until
+    paso_04_break
+    paso_04_continue
+    paso_04_eof
+    paso_04_eof_bucle
+    paso_04_case
+    paso_04_menu
+    paso_04_demo_bucles
+    paso_04_demo_menu
+    paso_04_como_probar
 )
 
 leccion_04() {
