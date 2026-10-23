@@ -19,7 +19,7 @@ pantallas, XP, desbloqueos y retos que se validan solos.
 ```bash
 ./bash4u.sh                   # empezar o continuar
 ./bash4u.sh --lista           # ver el estado de los niveles
-./bash4u.sh --leccion 2       # ir directo a un nivel
+./bash4u.sh --leccion 2       # empezar en un nivel
 ./bash4u.sh --solucion 2      # ver la solución de referencia
 ./bash4u.sh --self-test       # verificar que el propio curso funciona
 ./bash4u.sh --reset-nivel 2   # reiniciar el progreso de un nivel
@@ -28,6 +28,9 @@ pantallas, XP, desbloqueos y retos que se validan solos.
 También funciona con `bash bash4u.sh ...`. Opciones útiles: `--plano` (sin colores ni
 pantalla completa), `--rapido` (sin animaciones) y `--stage N` (previsualizar una etapa de
 la interfaz).
+
+Al terminar un nivel con `--leccion`, el curso ofrece continuar con el siguiente. Si entras
+sin opciones, el modo normal ya enlaza los niveles automáticamente.
 
 ## Atajos dentro de una lección
 
@@ -99,9 +102,9 @@ En los retos no se teclea la entrada: el curso la pasa automáticamente al proba
 código. Por eso `read -p` no muestra su mensaje durante la corrección (la entrada llega
 por una tubería); en las demos sí se ve, porque hay teclado.
 
-Al superar ciertos niveles se desbloquean mejoras de la interfaz: colores, menú, editor,
-fzf y estadísticas. El script no se modifica a sí mismo: el progreso guardado decide qué
-etapa se muestra.
+Al superar ciertos niveles se desbloquean mejoras de la interfaz: nivel 2 → colores;
+nivel 4 → menú; nivel 8 → estadísticas. El script no se modifica a sí mismo: el progreso
+guardado decide qué etapa se muestra.
 
 ## Estructura
 

@@ -12,7 +12,7 @@
 
 set -uo pipefail
 
-VERSION="0.4.0"
+VERSION="0.4.1"
 DIR_DATOS="${XDG_DATA_HOME:-$HOME/.local/share}/bash4u"
 ARCH_ESTADO="$DIR_DATOS/estado"
 DIR_PRACTICAS="${BASH4U_PRACTICAS:-$HOME/bash4u-practicas}"
@@ -371,6 +371,12 @@ paginar() {
                 fi
                 k=$((k - 1))
             done
+        fi
+
+        # Si la página siguiente se queda con muy pocas líneas, se
+        # muestran también aquí para no partir por un detalle.
+        if (( total - fin <= 3 )); then
+            fin=$total
         fi
 
         printf '%s\n' "${lineas[@]:i:fin-i}"
@@ -2210,18 +2216,33 @@ Los tienes guardados en el repaso adaptativo." "Enter para volver"
 demo_03_tests() {
     local nombre="Ada"
 
-    printf '%s\n' "→ test numérico verdadero"
+    printf '%s\n' "→ la variable y su valor"
+    printf '%s\n' '  nombre="Ada"'
+    printf '  nombre vale: %s\n' "$nombre"
+    printf '%s\n' "→ test numérico verdadero (¿5 > 3?)"
     printf '%s\n' '  (( 5 > 3 ))'
-    (( 5 > 3 )); printf '  código: %s\n' "$?"
-    printf '%s\n' "→ test numérico falso"
+    (( 5 > 3 )); printf '  código: %s (verdad)\n' "$?"
+    printf '%s\n' "→ test numérico falso (¿5 < 3?)"
     printf '%s\n' '  (( 5 < 3 ))'
-    (( 5 < 3 )); printf '  código: %s\n' "$?"
-    printf '%s\n' "→ test de texto verdadero"
+    (( 5 < 3 )); printf '  código: %s (falso)\n' "$?"
+    printf '%s\n' "→ test de texto verdadero (¿nombre es \"Ada\"?)"
     printf '%s\n' '  [[ $nombre = "Ada" ]]'
-    [[ $nombre = "Ada" ]]; printf '  código: %s\n' "$?"
-    printf '%s\n' "→ test de texto falso"
-    printf '%s\n' '  [[ $nombre != "Ada" ]]'
-    [[ $nombre != "Ada" ]]; printf '  código: %s\n' "$?"
+    [[ $nombre = "Ada" ]]; printf '  código: %s (verdad)\n' "$?"
+    printf '%s\n' "→ test de texto falso (¿nombre es \"Bob\"?)"
+    printf '%s\n' '  [[ $nombre = "Bob" ]]'
+    [[ $nombre = "Bob" ]]; printf '  código: %s (falso)\n' "$?"
+    printf '%s\n' "→ test de texto con != (¿nombre no es \"Bob\"?)"
+    printf '%s\n' '  [[ $nombre != "Bob" ]]'
+    [[ $nombre != "Bob" ]]; printf '  código: %s (verdad)\n' "$?"
+    printf '%s\n' "→ dos tests unidos con && (las dos verdad)"
+    printf '%s\n' '  (( 5 > 3 )) && (( 5 < 9 ))'
+    (( 5 > 3 )) && (( 5 < 9 )); printf '  código: %s (verdad)\n' "$?"
+    printf '%s\n' "→ dos tests unidos con || (basta una verdad)"
+    printf '%s\n' '  (( 5 > 10 )) || (( 5 < 9 ))'
+    (( 5 > 10 )) || (( 5 < 9 )); printf '  código: %s (verdad)\n' "$?"
+    printf '%s\n' "→ negar con ! (invierte el resultado)"
+    printf '%s\n' '  ! (( 5 > 10 ))'
+    ! (( 5 > 10 )); printf '  código: %s (verdad)\n' "$?"
     return 0
 }
 
@@ -2299,85 +2320,188 @@ reto_03_2() {
     definir_reto \
         "3.2" \
         "OBJETIVO
-Lee un número con read -r n.
-Si es mayor que 3, imprime: mayor
-Si no, imprime: no
+Este script debería imprimir «mayor», pero imprime «no».
+Corrígelo.
 
-Entrada 5 → mayor
-Entrada 2 → no
+MIRA LÍNEA A LÍNEA
+  n=5                    # n vale 5
+  if (( n < 3 )); then   # 5 < 3 es falso → salta al else
+      echo \"mayor\"       # no se ejecuta
+  else                   # si la condición es falsa:
+      echo \"no\"          # imprime no
+  fi                     # fin del if
 
-Usa (( n > 3 )) y escribe el if completo.
-Termina con #fin." \
-        "read -r n
-if (( n > 3 )); then
-    echo \"mayor\"
-else
-    echo \"no\"
-fi" \
-        'read -r n
+CÓMO
+Cambia solo la condición para que con n=5 sea verdadera.
+Escribe el script completo.
+
+SALIDA ESPERADA
+  mayor" \
+        "Con n=5, la condición tiene que ser verdadera.
+Prueba (( n > 3 ))." \
+        'n=5
 if (( n > 3 )); then
     echo "mayor"
 else
     echo "no"
 fi' \
-        'read -r n
-echo "mayor"' \
+        'n=5
+if (( n < 3 )); then
+    echo "mayor"
+else
+    echo "no"
+fi' \
         '' 5 \
-        "5|mayor|0" \
-        "2|no|0" \
-        "3|no|0"
-    R_LOGRO="Has escrito un if/else que decide según el número."
+        "|mayor|0"
+    R_NOTA="CÓMO SE EJECUTA
+Escribe el script completo, manteniendo el if/else.
+El curso lo ejecuta con bash y compara la salida."
+    R_LOGRO="Has encontrado y corregido una condición equivocada."
 }
 
 RETOS_03=(reto_03_1 reto_03_2)
 
 paso_03_intro() {
     pantalla "Nivel 3 · ${TITULOS[3]}" "Un test es una pregunta que responde sí (0) o no (1).
-if elige qué bloque se ejecuta según esa respuesta." ""
+if elige qué bloque se ejecuta según esa respuesta.
+
+Cuando veas código, puedes probarlo en otra terminal." ""
 }
 
 paso_03_test_numeros() {
-    pantalla "Nivel 3 · Parte 1" "0 = verdad · 1 = falso" ""
+    pantalla "Nivel 3 · Parte 1" "El test deja 0 (verdad) o 1 (falso)" ""
     paginar "$(cat <<'TEXTO'
 Dentro de (( )) se comparan números.
+El resultado no se imprime: se consulta con $?.
 
 código:
-  (( 5 > 3 ))
-  echo $?
-  (( 5 < 3 ))
-  echo $?
+  (( 5 > 3 ))   # ¿5 es mayor que 3? sí
+  echo $?       # 0 (verdad)
+  (( 5 < 3 ))   # ¿5 es menor que 3? no
+  echo $?       # 1 (falso)
 
 salida:
   0
   1
 
-Operadores: >  >=  <  <=  ==  !=
+Operadores numéricos: >  >=  <  <=  ==  !=
+Pruébalo tú: abre otra terminal, pega el código y mira el 0/1 con echo $?.
 TEXTO
 )"
 }
 
 paso_03_test_texto() {
-    pantalla "Nivel 3 · Parte 1" "Texto: = y != (con espacios)" ""
+    pantalla "Nivel 3 · Parte 1" "Texto: primero se guarda, luego se compara" ""
     paginar "$(cat <<'TEXTO'
-El texto se compara dentro de [[ ]].
+nombre guarda el texto Ada. Ese es el valor que se compara.
 
 código:
-  nombre=Ada
-  [[ $nombre = "Ada" ]]
-  echo $?
-  [[ $nombre != "Ada" ]]
-  echo $?
+  nombre="Ada"
+  echo "$nombre"         # Ada (el valor guardado)
+  [[ $nombre = "Ada" ]]  # ¿es Ada? sí
+  echo $?                # 0 (verdad)
+  [[ $nombre = "Bob" ]]  # ¿es Bob? no
+  echo $?                # 1 (falso)
+  [[ $nombre != "Bob" ]] # ¿no es Bob? sí
+  echo $?                # 0 (verdad)
+
+salida:
+  Ada
+  0
+  1
+  0
+
+Dentro de [[ ]] se usa = (o ==) y !=.
+Los espacios alrededor del operador son obligatorios.
+Pruébalo tú: abre otra terminal, pega el código y mira el 0/1 con echo $?.
+TEXTO
+)"
+}
+
+paso_03_test_logicos() {
+    pantalla "Nivel 3 · Parte 1" "&& (y) · || (o)" ""
+    paginar "$(cat <<'TEXTO'
+Un test responde 0 (verdad) o 1 (falso).
+&& pide las dos verdad; || se conforma con una.
+A y B son dos tests cualesquiera:
+
+  A        B        A && B   A || B
+  verdad   verdad   verdad   verdad
+  verdad   falso    falso    verdad
+  falso    verdad   falso    verdad
+  falso    falso    falso    falso
+
+Con n=7:
+
+código:
+  n=7
+  (( n > 3 )) && (( n < 9 ))   # 0: las dos verdad
+  (( n > 3 )) || (( n > 10 ))  # 0: basta una
+  (( n > 10 )) && (( n < 9 ))  # 1: la primera es falsa
+
+salida:
+  0
+  0
+  1
+
+&& se para en el primer falso; || se para en el primer verdad.
+El resultado combinado también es 0 o 1, así que if lo acepta igual.
+Pruébalo tú: abre otra terminal, pega el código y mira el 0/1 con echo $?.
+TEXTO
+)"
+}
+
+paso_03_test_negacion() {
+    pantalla "Nivel 3 · Parte 1" "! (no): invertir un test" ""
+    paginar "$(cat <<'TEXTO'
+! invierte el test que tiene a su derecha.
+
+código:
+  n=7
+  ! (( n > 10 ))   # 0: «7 > 10» es falso; ! lo hace verdad
+  ! (( n > 3 ))    # 1: «7 > 3» es verdad; ! lo hace falso
 
 salida:
   0
   1
+
+Pruébalo tú: abre otra terminal, pega el código y mira el 0/1 con echo $?.
+TEXTO
+)"
+}
+
+paso_03_test_negacion_texto() {
+    pantalla "Nivel 3 · Parte 1" "! y && con texto" ""
+    paginar "$(cat <<'TEXTO'
+Con nombre="Ada":
+
+código:
+  [[ ! $nombre = "Bob" ]]                    # 0: no es Bob
+  [[ $nombre = "Ada" && $nombre != "Bob" ]]  # 0: las dos verdad
+
+salida:
+  0
+  0
+
+«! $nombre = "Bob"» significa: no es verdad que sea Bob.
+«$nombre = "Ada" && $nombre != "Bob"» significa:
+  es Ada y no es Bob.
+
+Dentro de [[ ]] los tests van en una sola expresión:
+  [[ condición && condición ]]
+Fuera de [[ ]], && encadena comandos (como en el nivel 2):
+  (( n > 3 )) && echo "mayor"
+
+Pruébalo tú: abre otra terminal, pega el código y mira el 0/1 con echo $?.
 TEXTO
 )"
 }
 
 paso_03_if_sintaxis() {
-    pantalla "Nivel 3 · Parte 2" "if: si es verdad, haz esto" ""
+    pantalla "Nivel 3 · Parte 2" "if: la sintaxis y el ; then" ""
     paginar "$(cat <<'TEXTO'
+Con n=5:
+
 código:
   n=5
   if (( n > 3 )); then
@@ -2387,8 +2511,42 @@ código:
 salida:
   mayor
 
-then abre el bloque; fi lo cierra.
-Dentro van 4 espacios para leerlo mejor.
+if empieza; then abre el bloque; fi lo cierra.
+El ; separa órdenes en una misma línea; un salto también vale.
+Va al final de la condición, antes de then, que es otra palabra.
+Sin ; o salto de línea, «then» pegado da error:
+  if (( n > 3 )) then    ← error
+
+Si pones then en otra línea, el ; no hace falta:
+  if (( n > 3 ))
+  then
+      echo "mayor"
+  fi
+
+Pruébalo tú: prueba las dos formas en otra terminal.
+TEXTO
+)"
+}
+
+paso_03_if_indentacion() {
+    pantalla "Nivel 3 · Parte 2" "Indentar: solo para leer mejor" ""
+    paginar "$(cat <<'TEXTO'
+La indentación no es obligatoria: bash no la usa para saber
+qué va dentro del if. Lo que manda es then ... fi.
+
+Las dos versiones funcionan igual:
+
+  if (( n > 3 )); then
+  echo "mayor"
+  fi
+
+  if (( n > 3 )); then
+      echo "mayor"
+  fi
+
+La segunda se lee mejor: 4 espacios muestran qué está dentro.
+else y elif van al mismo nivel que if.
+Consejo: usa siempre 4 espacios y no mezcles espacios y tabuladores.
 TEXTO
 )"
 }
@@ -2408,6 +2566,8 @@ salida:
   no
 
 Solo se ejecuta una de las dos ramas.
+else va solo, sin condición y sin ;.
+Pruébalo tú: abre otra terminal y prueba el código con n=2 y n=5.
 TEXTO
 )"
 }
@@ -2427,12 +2587,16 @@ código:
 
 salida:
   aprobado
+
+elif lleva su propia condición y también ; then.
+Pruébalo tú: abre otra terminal y prueba nota con 9, 7 y 3.
 TEXTO
 )"
 }
 
 paso_03_demo_tests() {
-    pantalla "Nivel 3 · Demo de tests" "Mira el código 0/1 que deja cada comparación." ""
+    pantalla "Nivel 3 · Demo de tests" "Mira el valor de la variable y el código 0/1
+que deja cada comparación." ""
     demo_03_tests
 }
 
@@ -2443,15 +2607,21 @@ paso_03_demo_if() {
 
 paso_03_como_probar() {
     pantalla "Nivel 3 · Cómo se prueban los retos" "3.1: lees un if y escribes su salida (una línea).
-3.2: escribes un if completo, línea por línea.
-Termina con #fin; :pista te enseña la estructura." ""
+3.2: corriges un if que elige la rama equivocada.
+Termina con #fin; :pista te enseña la estructura.
+
+Si dudas, abre otra terminal y prueba el código antes de responder." ""
 }
 
 PASOS_03=(
     paso_03_intro
     paso_03_test_numeros
     paso_03_test_texto
+    paso_03_test_logicos
+    paso_03_test_negacion
+    paso_03_test_negacion_texto
     paso_03_if_sintaxis
+    paso_03_if_indentacion
     paso_03_if_else
     paso_03_if_elif
     paso_03_demo_tests
@@ -2771,6 +2941,42 @@ El siguiente hito es el menú: se desbloquea al superar el nivel 4." "Enter para
             menu_principal
             return 0
         fi
+    done
+}
+
+# Con --leccion N se empieza en ese nivel. Al terminarlo se ofrece el
+# siguiente para no dejar el curso a medias; tras el nivel 4, que desbloquea
+# el menú, se abre el menú como en el modo lineal.
+jugar_leccion_directa() {
+    local num=$1 respuesta siguiente fn
+
+    while true; do
+        ejecutar_leccion "$num" || return $?
+
+        if (( num == 4 )) && tiene_cap menu; then
+            menu_principal
+            return 0
+        fi
+
+        (( num >= 12 )) && return 0
+        siguiente=$((num + 1))
+        fn=$(funcion_leccion "$siguiente")
+        declare -F "$fn" >/dev/null 2>&1 || return 0
+
+        pantalla "Siguiente nivel" "Nivel ${siguiente} · ${TITULOS[$siguiente]}" "Enter para continuar · n para salir"
+        while true; do
+            printf '%s' "${C_PROMPT}Enter/n: ${C_RESET}"
+            if ! IFS= read -r -e respuesta; then
+                printf '\n'
+                return 0
+            fi
+
+            case $respuesta in
+                "") num=$siguiente; break ;;
+                n|N|no|No|NO|:salir|salir|q|Q) return 0 ;;
+                *) printf '%s\n' "${C_GRIS}  Enter para continuar o n para salir.${C_RESET}" ;;
+            esac
+        done
     done
 }
 
@@ -3329,7 +3535,7 @@ bash4u ${VERSION} — curso interactivo de Bash scripting
 Uso:
   bash bash4u.sh                 empezar o continuar
   bash bash4u.sh --lista         estado de los niveles
-  bash bash4u.sh --leccion N     jugar un nivel concreto
+  bash bash4u.sh --leccion N     empezar en un nivel concreto
   bash bash4u.sh --solucion N    ver las soluciones de un nivel
   bash bash4u.sh --self-test     verificar el propio curso
   bash bash4u.sh --stage N       previsualizar una etapa (0-5)
@@ -3421,7 +3627,7 @@ main() {
         selftest) self_test; return $? ;;
         lista)    mostrar_lista; return 0 ;;
         ayuda)    ayuda; return 0 ;;
-        leccion)  configurar_terminal; ejecutar_leccion "$arg"; return $? ;;
+        leccion)  configurar_terminal; jugar_leccion_directa "$arg"; return $? ;;
         solucion) mostrar_soluciones "$arg"; return $? ;;
     esac
 
