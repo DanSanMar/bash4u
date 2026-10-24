@@ -106,6 +106,16 @@ Al superar ciertos niveles se desbloquean mejoras de la interfaz: nivel 2 → co
 nivel 4 → menú; nivel 8 → estadísticas. El script no se modifica a sí mismo: el progreso
 guardado decide qué etapa se muestra.
 
+### Formato de las pantallas de teoría
+
+Ninguna pantalla de teoría pasa de **media pantalla**: 12 líneas como máximo en una
+terminal de 24 filas. Si un concepto necesita más texto, se reparte en varios pasos con su
+propio título; no se recorta el contenido. `paginar` sigue partiendo la pantalla de forma
+dinámica en terminales más pequeñas, pero el límite de 12 líneas es la regla de autoría.
+
+El `--self-test` comprueba que todos los bloques `paginar` cumplen el límite, así que un
+nivel nuevo que se pase falla las pruebas.
+
 ## Estructura
 
 ```

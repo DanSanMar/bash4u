@@ -12,7 +12,7 @@
 
 set -uo pipefail
 
-VERSION="0.5.0"
+VERSION="0.5.1"
 DIR_DATOS="${XDG_DATA_HOME:-$HOME/.local/share}/bash4u"
 ARCH_ESTADO="$DIR_DATOS/estado"
 DIR_PRACTICAS="${BASH4U_PRACTICAS:-$HOME/bash4u-practicas}"
@@ -345,6 +345,8 @@ paginar() {
 
     # Regla de la media pantalla: ninguna página llena la terminal.
     # Se usa la mitad de las líneas disponibles (mínimo 6).
+    # La teoría se escribe en bloques de 12 líneas como máximo (media
+    # pantalla de una terminal de 24); --self-test comprueba ese límite.
     if [[ $MODO_PLANO -eq 0 && -t 1 ]] && command -v tput >/dev/null 2>&1; then
         por_pagina=$(( $(tput lines 2>/dev/null || printf '24') / 2 ))
     fi
@@ -1181,7 +1183,7 @@ Al final escribirás y ejecutarás tus propios archivos." ""
 }
 
 paso_00_terminal() {
-    pantalla "Nivel 0 · Parte 1" "La terminal y las carpetas" ""
+    pantalla "Nivel 0 · Parte 1" "La terminal y el prompt" ""
     paginar "$(cat <<'TEXTO'
 La terminal es una ventana donde escribes órdenes.
 Bash es el programa que lee esas órdenes y las ejecuta.
@@ -1190,12 +1192,30 @@ Al abrir la terminal verás un prompt parecido a:
   arch@maquina:~$
 El prompt no se escribe: solo indica que bash espera una orden.
 
+Escribe una orden y pulsa Enter. Bash la ejecuta y vuelve
+a mostrar el prompt cuando termina.
+TEXTO
+)"
+}
+
+paso_00_ordenes() {
+    pantalla "Nivel 0 · Parte 1" "Comando y argumentos" ""
+    paginar "$(cat <<'TEXTO'
 Una orden tiene un comando y, a veces, argumentos:
   ls -l /home/arch
   │  │  └── argumento: qué quieres listar
   │  └───── argumento: cómo lo quieres listar
   └──────── comando: qué programa se ejecuta
 
+El comando es el programa; los argumentos le dicen qué hacer.
+Los espacios separan unas piezas de otras.
+TEXTO
+)"
+}
+
+paso_00_carpetas() {
+    pantalla "Nivel 0 · Parte 1" "Moverte por carpetas" ""
+    paginar "$(cat <<'TEXTO'
 El directorio actual es la carpeta donde estás.
   pwd          imprime el directorio actual (print working directory)
   ls           lista el contenido
@@ -1205,7 +1225,13 @@ El directorio actual es la carpeta donde estás.
   cd ..        sube a la carpeta padre
   cd           vuelve a tu carpeta personal
   cd -         vuelve a la carpeta anterior
+TEXTO
+)"
+}
 
+paso_00_rutas() {
+    pantalla "Nivel 0 · Parte 1" "Rutas: absoluta y relativa" ""
+    paginar "$(cat <<'TEXTO'
 Hay dos formas de escribir una ruta:
   /home/arch/notas.txt   absoluta: empieza por / y no depende de dónde estés
   notas.txt              relativa: se busca desde el directorio actual
@@ -1229,10 +1255,19 @@ extensión: la parte que va después del último punto.
   datos.csv   .csv  convención para datos separados por comas
   foto.png    .png  convención para imágenes
 
+La extensión es una convención para que las personas y los editores
+sepáis qué esperar; no forma parte del contenido.
+TEXTO
+)"
+}
+
+paso_00_archivos_ejecutar() {
+    pantalla "Nivel 0 · Parte 2" "La extensión no manda" ""
+    paginar "$(cat <<'TEXTO'
 La extensión NO cambia el contenido ni lo que bash puede hacer.
 Bash no mira la extensión: `bash archivo.txt` también ejecuta su texto.
-La extensión es una convención para que las personas y los editores
-sepáis qué esperar. Por eso:
+
+Por eso:
   - un script se llama .sh
   - una nota o un dato de texto se llama .txt
 
@@ -1254,25 +1289,39 @@ Sin comillas, bash parte la línea por los espacios:
 
 No es echo quien borra los espacios: bash ya los usó como separadores
 antes de ejecutarlo. Con comillas, el texto llega entero.
+TEXTO
+)"
+}
 
-  "..."  comillas dobles: conservan espacios y expanden $variables
-  '...'  comillas simples: conservan espacios y todo es literal
+paso_00_comillas_tipos() {
+    pantalla "Nivel 0 · Parte 3" "Comillas dobles y simples" ""
+    paginar "$(cat <<'TEXTO'
+Los dos tipos de comillas:
+  "..."  dobles: conservan espacios y expanden $variables
+  '...'  simples: conservan espacios y todo es literal
 
   echo "Vivo en $HOME"   → Vivo en /home/arch
   echo 'Vivo en $HOME'   → Vivo en $HOME
 
+Usa dobles por defecto; simples si quieres que $ y \ sean literales.
+TEXTO
+)"
+}
+
+paso_00_comillas_escape() {
+    pantalla "Nivel 0 · Parte 3" "Escapar y comillas rectas" ""
+    paginar "$(cat <<'TEXTO'
 La barra invertida \ escapa un carácter especial dentro de comillas
 dobles: \" imprime una comilla y \$ un dólar literal.
   echo "Él dijo \"hola\""  → Él dijo "hola"
   echo "Cuesta \$5"        → Cuesta $5
-Dentro de comillas simples no hace falta escapar: todo es literal.
 
+Dentro de comillas simples no hace falta escapar: todo es literal.
 Las comillas tampoco forman parte de la salida:
   echo "Hola"     → Hola
   echo '"Hola"'   → "Hola"
 
 Regla práctica: si el texto lleva espacios, ponlo entre comillas.
-Usa dobles por defecto; simples si quieres que $ y \ sean literales.
 Usa comillas rectas ' y ", no las curvas “ ”.
 TEXTO
 )"
@@ -1298,17 +1347,20 @@ nada en pantalla. Para añadir sin borrar lo anterior:
   echo "Adiós" >> saludo.txt
 
 Para ver lo que quedó dentro:
-
   cat saludo.txt
+TEXTO
+)"
+}
 
+paso_00_redirigir_rutas() {
+    pantalla "Nivel 0 · Parte 4" "Carpetas y rutas al redirigir" ""
+    paginar "$(cat <<'TEXTO'
 También puedes crear carpetas:
-
   mkdir practica
   mkdir -p ruta/que/no/existe
 
 > escribe; >> añade. El archivo se crea en el directorio actual
 salvo que indiques una ruta:
-
   echo "Hola" > practica/saludo.txt
 TEXTO
 )"
@@ -1325,11 +1377,18 @@ Un script es un archivo de texto con órdenes de bash, una por línea.
 La primera línea es el shebang: empieza por #! e indica qué programa
 debe interpretar el archivo. Al ejecutar ./script.sh, el sistema lee
 esa línea y usa /bin/bash.
-Si lo ejecutas con `bash script.sh`, el shebang no hace falta, pero
-es buena costumbre ponerlo.
 
 Las demás líneas que empiezan por # son comentarios: bash las ignora.
 Sirven para explicar el código.
+TEXTO
+)"
+}
+
+paso_00_script_ejecutar() {
+    pantalla "Nivel 0 · Parte 5" "Ejecutar y comprobar" ""
+    paginar "$(cat <<'TEXTO'
+Si ejecutas con `bash script.sh`, el shebang no hace falta,
+pero es buena costumbre ponerlo.
 
 Formas de ejecutar:
   bash hola.sh        bash lee el archivo; no necesita permiso de ejecución
@@ -1353,11 +1412,19 @@ No tienes que escribir nada todavía: solo mira y pulsa Enter." ""
 PASOS_00=(
     paso_00_intro
     paso_00_terminal
+    paso_00_ordenes
+    paso_00_carpetas
+    paso_00_rutas
     paso_00_archivos
+    paso_00_archivos_ejecutar
     paso_00_comillas
+    paso_00_comillas_tipos
+    paso_00_comillas_escape
     paso_00_demo_comillas
     paso_00_redirigir
+    paso_00_redirigir_rutas
     paso_00_script
+    paso_00_script_ejecutar
     paso_00_demo_final
 )
 
@@ -1533,7 +1600,7 @@ y leer lo que escribe el usuario." ""
 }
 
 paso_01_variables() {
-    pantalla "Nivel 1 · Parte 1" "Variables y comillas" ""
+    pantalla "Nivel 1 · Parte 1" "Variables: guardar un valor" ""
     paginar "$(cat <<'TEXTO'
 Una variable guarda un valor con un nombre. Se asigna así:
   nombre=Ada
@@ -1544,7 +1611,13 @@ No pongas espacios alrededor del =:
 Para usar el valor, pon $ delante:
   echo "Hola, $nombre"     → Hola, Ada
   echo 'Hola, $nombre'     → Hola, $nombre
+TEXTO
+)"
+}
 
+paso_01_variables_comillas() {
+    pantalla "Nivel 1 · Parte 1" "Variables: comillas y llaves" ""
+    paginar "$(cat <<'TEXTO'
 Las comillas dobles expanden la variable; las simples la dejan literal.
 Si el valor lleva espacios, ponlo entre comillas al asignarlo:
   frase="hola mundo"
@@ -1572,7 +1645,13 @@ Bash hace aritmética entera, sin decimales, con $(( )):
   echo $((a * b))    → 21
   echo $((a / b))    → 2    división entera
   echo $((a % b))    → 1    resto
+TEXTO
+)"
+}
 
+paso_01_aritmetica_variables() {
+    pantalla "Nivel 1 · Parte 2" "Aritmética: guardar el resultado" ""
+    paginar "$(cat <<'TEXTO'
 El resultado se puede guardar en una variable:
   edad=$((2026 - 1990))
   echo "Edad: $edad"
@@ -1598,7 +1677,13 @@ Forma completa, con el mensaje aparte:
   echo "¿Cómo te llamas?"
   read -r nombre
   echo "Hola, $nombre"
+TEXTO
+)"
+}
 
+paso_01_read_basico_pantalla() {
+    pantalla "Nivel 1 · Parte 2" "Qué se ve al ejecutarlo" ""
+    paginar "$(cat <<'TEXTO'
 En pantalla:
   ¿Cómo te llamas?
   Ada
@@ -1615,7 +1700,7 @@ paso_01_demo_read_basico() {
 }
 
 paso_01_read_p() {
-    pantalla "Nivel 1 · Parte 3" "read -p y -r" ""
+    pantalla "Nivel 1 · Parte 3" "read -p: mensaje y lectura" ""
     paginar "$(cat <<'TEXTO'
 read -p muestra el mensaje y lee en la misma orden:
   read -r -p "¿Cómo te llamas? " nombre
@@ -1623,7 +1708,13 @@ read -p muestra el mensaje y lee en la misma orden:
 
 El espacio final del mensaje separa el texto de lo que escribes.
 Esta es la forma más habitual dentro de un script.
+TEXTO
+)"
+}
 
+paso_01_read_p_raw() {
+    pantalla "Nivel 1 · Parte 3" "read -r: texto tal cual" ""
+    paginar "$(cat <<'TEXTO'
 -r significa «raw»: evita que se interpreten barras invertidas.
   read -r ruta     guarda C:\\Users\\arch tal cual
   read ruta        se come las barras: C:Usersarch
@@ -1654,12 +1745,16 @@ así que lo que ves con :probar es exactamente lo que se corrige." ""
 PASOS_01=(
     paso_01_intro
     paso_01_variables
+    paso_01_variables_comillas
     paso_01_demo_variables
     paso_01_aritmetica
+    paso_01_aritmetica_variables
     paso_01_demo_aritmetica
     paso_01_read_basico
+    paso_01_read_basico_pantalla
     paso_01_demo_read_basico
     paso_01_read_p
+    paso_01_read_p_raw
     paso_01_demo_read_p
     paso_01_como_probar
 )
@@ -1910,7 +2005,13 @@ salida:   lo que aparece al ejecutarlo
 
 código:
   echo "Hola, mundo"
+TEXTO
+)"
+}
 
+paso_02_stdout_salida() {
+    pantalla "Nivel 2 · Parte 1" "La salida de echo" ""
+    paginar "$(cat <<'TEXTO'
 salida:
   Hola, mundo
 
@@ -1929,7 +2030,13 @@ printf no añade el salto de línea: se lo pides con \n.
 código:
   printf "Hola\n"
   printf "Adiós\n"
+TEXTO
+)"
+}
 
+paso_02_printf_salida() {
+    pantalla "Nivel 2 · Parte 1" "printf: la salida" ""
+    paginar "$(cat <<'TEXTO'
 salida:
   Hola
   Adiós
@@ -1970,7 +2077,13 @@ código (variables):
   nombre=Ada
   edad=9
   printf "%s tiene %d años\n" "$nombre" "$edad"
+TEXTO
+)"
+}
 
+paso_02_printf_variables_salida() {
+    pantalla "Nivel 2 · Parte 1" "printf: la misma salida" ""
+    paginar "$(cat <<'TEXTO'
 salida en ambos casos:
   Ada tiene 9 años
 
@@ -1992,7 +2105,13 @@ código:
 
 salida:
   Ada sacó un 9
+TEXTO
+)"
+}
 
+paso_02_formato_hueco() {
+    pantalla "Nivel 2 · Parte 1" "printf: qué es un hueco" ""
+    paginar "$(cat <<'TEXTO'
 Cada comodín o "hueco" que pones en el texto 
 se rellena estrictamente con los valores que le pasas después, 
 de izquierda a derecha.
@@ -2028,7 +2147,13 @@ Con nombre1=Carlos, edad1=25, nombre2=Sofía y edad2=30:
 código:
   printf "%s tiene %d años y %s tiene %d años.\n" \
       "$nombre1" "$edad1" "$nombre2" "$edad2"
+TEXTO
+)"
+}
 
+paso_02_formato_varios_salida() {
+    pantalla "Nivel 2 · Parte 1" "printf: el resultado de los cuatro huecos" ""
+    paginar "$(cat <<'TEXTO'
 salida:
   Carlos tiene 25 años y Sofía tiene 30 años.
 
@@ -2126,7 +2251,13 @@ Cada comando termina con un código de salida:
 
   0      salió bien
   otro   hubo un problema
+TEXTO
+)"
+}
 
+paso_02_codigos_que_ejemplo() {
+    pantalla "Nivel 2 · Parte 3" "\$? guarda el último código" ""
+    paginar "$(cat <<'TEXTO'
 $? guarda el código del último comando. Hasta echo deja uno:
 
 código:
@@ -2152,7 +2283,13 @@ código:
   n=5
   (( n > 10 ))
   echo $?
+TEXTO
+)"
+}
 
+paso_02_codigos_fallo_salida() {
+    pantalla "Nivel 2 · Parte 3" "La comparación falsa deja 1" ""
+    paginar "$(cat <<'TEXTO'
 salida:
   1
 
@@ -2171,7 +2308,13 @@ código:
   (( n > 10 ))   # falso: deja 1
   echo "hola"    # bien: deja 0
   echo $?
+TEXTO
+)"
+}
 
+paso_02_codigos_pisar_guardar() {
+    pantalla "Nivel 2 · Parte 3" "Guardar un código antes de que se pierda" ""
+    paginar "$(cat <<'TEXTO'
 salida:
   hola
   0
@@ -2192,7 +2335,13 @@ código:
   echo "antes del comando 'exit' se ejecuta el script"
   exit 1
   echo "esto no llega a ejecutarse nunca"
+TEXTO
+)"
+}
 
+paso_02_codigos_exit_salida() {
+    pantalla "Nivel 2 · Parte 3" "exit: qué se ejecuta" ""
+    paginar "$(cat <<'TEXTO'
 salida:
   antes del comando 'exit' se ejecuta el script
   (el script termina con código de error 1)
@@ -2280,12 +2429,17 @@ Escribe la línea y pulsa Enter; no hace falta #fin." ""
 PASOS_02=(
     paso_02_intro
     paso_02_stdout
+    paso_02_stdout_salida
     paso_02_printf
+    paso_02_printf_salida
     paso_02_printf_valores
     paso_02_printf_variables
+    paso_02_printf_variables_salida
     paso_02_formato
+    paso_02_formato_hueco
     paso_02_formato_orden
     paso_02_formato_varios
+    paso_02_formato_varios_salida
     paso_02_resumen_salida
     paso_02_demo_salida
     paso_02_entrada_variable
@@ -2293,9 +2447,13 @@ PASOS_02=(
     paso_02_entrada_p
     paso_02_demo_entrada
     paso_02_codigos_que
+    paso_02_codigos_que_ejemplo
     paso_02_codigos_fallo
+    paso_02_codigos_fallo_salida
     paso_02_codigos_pisar
+    paso_02_codigos_pisar_guardar
     paso_02_codigos_exit
+    paso_02_codigos_exit_salida
     paso_02_demo_codigos
     paso_02_condicional_and
     paso_02_condicional_or
@@ -2486,7 +2644,13 @@ código:
   echo $?       # 0 (verdad)
   (( 5 < 3 ))   # ¿5 es menor que 3? no
   echo $?       # 1 (falso)
+TEXTO
+)"
+}
 
+paso_03_test_numeros_salida() {
+    pantalla "Nivel 3 · Parte 1" "La salida del test numérico" ""
+    paginar "$(cat <<'TEXTO'
 salida:
   0
   1
@@ -2511,7 +2675,13 @@ código:
   echo $?                # 1 (falso)
   [[ $nombre != "Bob" ]] # ¿no es Bob? sí
   echo $?                # 0 (verdad)
+TEXTO
+)"
+}
 
+paso_03_test_texto_salida() {
+    pantalla "Nivel 3 · Parte 1" "Comparar texto: la salida" ""
+    paginar "$(cat <<'TEXTO'
 salida:
   Ada
   0
@@ -2537,7 +2707,13 @@ A y B son dos tests cualesquiera:
   verdad   falso    falso    verdad
   falso    verdad   falso    verdad
   falso    falso    falso    falso
+TEXTO
+)"
+}
 
+paso_03_test_logicos_ejemplo() {
+    pantalla "Nivel 3 · Parte 1" "&& y || con n=7" ""
+    paginar "$(cat <<'TEXTO'
 Con n=7:
 
 código:
@@ -2550,7 +2726,13 @@ salida:
   0
   0
   1
+TEXTO
+)"
+}
 
+paso_03_test_logicos_regla() {
+    pantalla "Nivel 3 · Parte 1" "Cómo se combinan los tests" ""
+    paginar "$(cat <<'TEXTO'
 && se para en el primer falso; || se para en el primer verdad.
 El resultado combinado también es 0 o 1, así que if lo acepta igual.
 Pruébalo tú: abre otra terminal, pega el código y mira el 0/1 con echo $?.
@@ -2589,7 +2771,13 @@ código:
 salida:
   0
   0
+TEXTO
+)"
+}
 
+paso_03_test_negacion_texto_reglas() {
+    pantalla "Nivel 3 · Parte 1" "Leer una expresión con ! y &&" ""
+    paginar "$(cat <<'TEXTO'
 «! $nombre = "Bob"» significa: no es verdad que sea Bob.
 «$nombre = "Ada" && $nombre != "Bob"» significa:
   es Ada y no es Bob.
@@ -2617,13 +2805,25 @@ código:
 
 salida:
   mayor
+TEXTO
+)"
+}
 
+paso_03_if_sintaxis_error() {
+    pantalla "Nivel 3 · Parte 2" "if: el ; antes de then" ""
+    paginar "$(cat <<'TEXTO'
 if empieza; then abre el bloque; fi lo cierra.
 El ; separa órdenes en una misma línea; un salto también vale.
 Va al final de la condición, antes de then, que es otra palabra.
 Sin ; o salto de línea, «then» pegado da error:
   if (( n > 3 )) then    ← error
+TEXTO
+)"
+}
 
+paso_03_if_sintaxis_then() {
+    pantalla "Nivel 3 · Parte 2" "if: then en otra línea" ""
+    paginar "$(cat <<'TEXTO'
 Si pones then en otra línea, el ; no hace falta:
   if (( n > 3 ))
   then
@@ -2646,7 +2846,13 @@ Las dos versiones funcionan igual:
   if (( n > 3 )); then
   echo "mayor"
   fi
+TEXTO
+)"
+}
 
+paso_03_if_indentacion_dos() {
+    pantalla "Nivel 3 · Parte 2" "Indentar: las dos versiones" ""
+    paginar "$(cat <<'TEXTO'
   if (( n > 3 )); then
       echo "mayor"
   fi
@@ -2671,7 +2877,13 @@ código:
 
 salida:
   no
+TEXTO
+)"
+}
 
+paso_03_if_else_regla() {
+    pantalla "Nivel 3 · Parte 2" "else: una sola rama" ""
+    paginar "$(cat <<'TEXTO'
 Solo se ejecuta una de las dos ramas.
 else va solo, sin condición y sin ;.
 Pruébalo tú: abre otra terminal y prueba el código con n=2 y n=5.
@@ -2691,7 +2903,13 @@ código:
   else
       echo "suspenso"
   fi
+TEXTO
+)"
+}
 
+paso_03_if_elif_salida() {
+    pantalla "Nivel 3 · Parte 2" "elif: la rama que se ejecuta" ""
+    paginar "$(cat <<'TEXTO'
 salida:
   aprobado
 
@@ -2723,14 +2941,24 @@ Si dudas, abre otra terminal y prueba el código antes de responder." ""
 PASOS_03=(
     paso_03_intro
     paso_03_test_numeros
+    paso_03_test_numeros_salida
     paso_03_test_texto
+    paso_03_test_texto_salida
     paso_03_test_logicos
+    paso_03_test_logicos_ejemplo
+    paso_03_test_logicos_regla
     paso_03_test_negacion
     paso_03_test_negacion_texto
+    paso_03_test_negacion_texto_reglas
     paso_03_if_sintaxis
+    paso_03_if_sintaxis_error
+    paso_03_if_sintaxis_then
     paso_03_if_indentacion
+    paso_03_if_indentacion_dos
     paso_03_if_else
+    paso_03_if_else_regla
     paso_03_if_elif
+    paso_03_if_elif_salida
     paso_03_demo_tests
     paso_03_demo_if
     paso_03_como_probar
@@ -2970,9 +3198,11 @@ Sin bucle, para imprimir 1, 2 y 3 escribirías:
 Con un bucle escribes el echo una vez y cambias el valor.
 
 Sirve para recorrer una lista, contar hasta un límite o
-repetir un menú hasta que elijas salir.
+repetir un menú hasta que elijas salir." ""
+}
 
-En este nivel verás:
+paso_04_intro_temas() {
+    pantalla "Nivel 4 · ${TITULOS[4]}" "En este nivel verás:
   for       recorrer una lista o un rango
   while     repetir mientras una condición sea verdad
   until     repetir hasta que una condición sea verdad
@@ -2999,7 +3229,13 @@ Los tres bucles tienen la misma estructura:
   until ...; do
       comandos
   done
+TEXTO
+)"
+}
 
+paso_04_sintaxis_do() {
+    pantalla "Nivel 4 · Parte 1" "El ; antes de do y la indentación" ""
+    paginar "$(cat <<'TEXTO'
 El ; antes de do separa la cabecera del bloque,
 igual que ; then en el if.
 Si pones do en otra línea, el ; no hace falta:
@@ -3022,7 +3258,13 @@ código:
   for fruta in manzana pera uva; do
       echo "$fruta"
   done
+TEXTO
+)"
+}
 
+paso_04_for_lista_salida() {
+    pantalla "Nivel 4 · Parte 1" "for: la salida de la lista" ""
+    paginar "$(cat <<'TEXTO'
 salida:
   manzana
   pera
@@ -3043,7 +3285,13 @@ código:
   for i in {1..5}; do
       echo "vuelta $i"
   done
+TEXTO
+)"
+}
 
+paso_04_for_rango_salida() {
+    pantalla "Nivel 4 · Parte 1" "for: el rango por pantalla" ""
+    paginar "$(cat <<'TEXTO'
 salida:
   vuelta 1
   vuelta 2
@@ -3069,7 +3317,13 @@ código:
       n=$((n + 1))
       echo "vuelta $n"
   done
+TEXTO
+)"
+}
 
+paso_04_while_salida() {
+    pantalla "Nivel 4 · Parte 1" "while: la salida y el contador" ""
+    paginar "$(cat <<'TEXTO'
 salida:
   vuelta 1
   vuelta 2
@@ -3093,7 +3347,13 @@ código:
       n=$((n + 1))
       echo "hasta $n"
   done
+TEXTO
+)"
+}
 
+paso_04_until_salida() {
+    pantalla "Nivel 4 · Parte 1" "until: la salida" ""
+    paginar "$(cat <<'TEXTO'
 salida:
   hasta 1
   hasta 2
@@ -3117,7 +3377,13 @@ código:
       fi
       echo "$i"
   done
+TEXTO
+)"
+}
 
+paso_04_break_salida() {
+    pantalla "Nivel 4 · Parte 2" "break: qué se llega a imprimir" ""
+    paginar "$(cat <<'TEXTO'
 salida:
   1
   2
@@ -3140,7 +3406,13 @@ código:
       fi
       echo "$i"
   done
+TEXTO
+)"
+}
 
+paso_04_continue_salida() {
+    pantalla "Nivel 4 · Parte 2" "continue: la vuelta que se salta" ""
+    paginar "$(cat <<'TEXTO'
 salida:
   1
   2
@@ -3183,7 +3455,13 @@ Cuidado con este menú:
 
 Si la entrada se acaba, read falla y el bucle vuelve a
 empezar: se queda girando sin fin.
+TEXTO
+)"
+}
 
+paso_04_eof_bucle_solucion() {
+    pantalla "Nivel 4 · Parte 3" "La solución: comprobar read" ""
+    paginar "$(cat <<'TEXTO'
 La solución: comprobar read y salir si falla.
   read -r opcion || break
 
@@ -3206,7 +3484,13 @@ código:
       3) echo "fin" ;;
       *) echo "opcion invalida" ;;
   esac
+TEXTO
+)"
+}
 
+paso_04_case_salida() {
+    pantalla "Nivel 4 · Parte 4" "case: la rama elegida" ""
+    paginar "$(cat <<'TEXTO'
 salida:
   adios
 
@@ -3228,6 +3512,13 @@ código:
       echo "2) despedir"
       echo "3) salir"
       read -r opcion || break
+TEXTO
+)"
+}
+
+paso_04_menu_case() {
+    pantalla "Nivel 4 · Parte 4" "El case del menú" ""
+    paginar "$(cat <<'TEXTO'
       case $opcion in
           1) echo "hola" ;;
           2) echo "adios" ;;
@@ -3235,7 +3526,13 @@ código:
           *) echo "opcion invalida" ;;
       esac
   done
+TEXTO
+)"
+}
 
+paso_04_menu_salida() {
+    pantalla "Nivel 4 · Parte 4" "El menú: las acciones" ""
+    paginar "$(cat <<'TEXTO'
 salida (el menú se repite; aquí solo las acciones):
   hola
   adios
@@ -3271,17 +3568,29 @@ Si dudas, abre otra terminal y prueba el código antes de responder." ""
 
 PASOS_04=(
     paso_04_intro
+    paso_04_intro_temas
     paso_04_sintaxis
+    paso_04_sintaxis_do
     paso_04_for_lista
+    paso_04_for_lista_salida
     paso_04_for_rango
+    paso_04_for_rango_salida
     paso_04_while
+    paso_04_while_salida
     paso_04_until
+    paso_04_until_salida
     paso_04_break
+    paso_04_break_salida
     paso_04_continue
+    paso_04_continue_salida
     paso_04_eof
     paso_04_eof_bucle
+    paso_04_eof_bucle_solucion
     paso_04_case
+    paso_04_case_salida
     paso_04_menu
+    paso_04_menu_case
+    paso_04_menu_salida
     paso_04_demo_bucles
     paso_04_demo_menu
     paso_04_como_probar
@@ -3453,6 +3762,37 @@ jugar_leccion_directa() {
 ok() { printf '  ✔ %s\n' "$1"; }
 mal() { printf '  ✘ %s\n' "$1"; }
 
+# Regla de formato de la teoría: ninguna pantalla (bloque paginar) pasa
+# de media pantalla, 12 líneas en una terminal de 24 filas.
+MAX_LINEAS_TEORIA=12
+
+probar_formato_teoria() {
+    local archivo=$1 linea limpia num=0 inicio=0 n=0 dentro=0 fallos=0
+    while IFS= read -r linea || [[ -n $linea ]]; do
+        num=$((num + 1))
+        if (( ! dentro )); then
+            limpia=${linea#"${linea%%[![:space:]]*}"}
+            if [[ $limpia == 'paginar "$(cat <<'* ]]; then
+                dentro=1
+                inicio=$num
+                n=0
+            fi
+            continue
+        fi
+        if [[ $linea == "TEXTO" ]]; then
+            dentro=0
+            if (( n > MAX_LINEAS_TEORIA )); then
+                printf '    línea %d: %d líneas (máximo %d)\n' \
+                    "$inicio" "$n" "$MAX_LINEAS_TEORIA"
+                fallos=$((fallos + 1))
+            fi
+        else
+            n=$((n + 1))
+        fi
+    done < "$archivo"
+    (( fallos == 0 ))
+}
+
 probar_etapas() {
     local s
     for s in 0 1 2 3 4 5; do
@@ -3612,6 +3952,14 @@ self_test() {
 
     total=$((total + 1))
     if bash -n "$0"; then ok "sintaxis (bash -n)"; else mal "sintaxis (bash -n)"; fallos=$((fallos + 1)); fi
+
+    total=$((total + 1))
+    if probar_formato_teoria "$0"; then
+        ok "formato de teoría (máximo ${MAX_LINEAS_TEORIA} líneas)"
+    else
+        mal "formato de teoría (máximo ${MAX_LINEAS_TEORIA} líneas)"
+        fallos=$((fallos + 1))
+    fi
 
     total=$((total + 1))
     if probar_etapas; then ok "etapas 0-5"; else mal "etapas 0-5"; fallos=$((fallos + 1)); fi
