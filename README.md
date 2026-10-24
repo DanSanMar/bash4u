@@ -20,6 +20,7 @@ pantallas, XP, desbloqueos y retos que se validan solos.
 ./bash4u.sh                   # empezar o continuar
 ./bash4u.sh --lista           # ver el estado de los niveles
 ./bash4u.sh --leccion 2       # empezar en un nivel
+./bash4u.sh --repaso          # ver la teoría y saltar los retos
 ./bash4u.sh --solucion 2      # ver la solución de referencia
 ./bash4u.sh --self-test       # verificar que el propio curso funciona
 ./bash4u.sh --reset-nivel 2   # reiniciar el progreso de un nivel
@@ -46,6 +47,20 @@ En cada pausa y al final de cada página puedes escribir:
 
 Con `:atras` puedes repasar la teoría y las demos sin perder el progreso. Los atajos
 aparecen en la propia línea de la pausa.
+
+## Modo repaso
+
+`--repaso` (o `--saltar-retos`) muestra la teoría de los niveles y omite los retos. Sirve
+para revisar el curso sin repetir ejercicios:
+
+```bash
+./bash4u.sh --repaso              # recorrer la teoría desde el nivel 0
+./bash4u.sh --repaso --leccion 3  # revisar un nivel concreto
+```
+
+El modo repaso **no modifica el progreso**: no marca el nivel como superado, no suma XP y
+no desbloquea habilidades. Al terminar la teoría de un nivel ofrece el siguiente. Si
+quieres que un nivel cuente para el juego, haz sus retos en el modo normal.
 
 ## Reiniciar el progreso
 

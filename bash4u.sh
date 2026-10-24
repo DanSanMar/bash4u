@@ -12,7 +12,7 @@
 
 set -uo pipefail
 
-VERSION="0.5.1"
+VERSION="0.5.2"
 DIR_DATOS="${XDG_DATA_HOME:-$HOME/.local/share}/bash4u"
 ARCH_ESTADO="$DIR_DATOS/estado"
 DIR_PRACTICAS="${BASH4U_PRACTICAS:-$HOME/bash4u-practicas}"
@@ -20,6 +20,7 @@ DIR_PRACTICAS="${BASH4U_PRACTICAS:-$HOME/bash4u-practicas}"
 # ---------------------------------------------------------------- opciones ---
 MODO_PLANO=0
 MODO_RAPIDO=0
+MODO_REPASO=0   # con --repaso se ve la teoría y se omiten los retos
 AUTOTEST=0
 CAPS_OVERRIDE=""
 CAPS_OVERRIDE_ACTIVO=0
@@ -938,6 +939,20 @@ siguiente_leccion() {
     return 0
 }
 
+# Primer nivel implementado desde N (incluido). Lo usa el modo repaso para
+# recorrer la teoría de todos los niveles aunque no estén superados.
+siguiente_implementado() {
+    local n=$1
+    while (( n <= 12 )); do
+        if declare -F "$(funcion_leccion "$n")" >/dev/null 2>&1; then
+            printf '%s' "$n"
+            return 0
+        fi
+        n=$((n + 1))
+    done
+    return 1
+}
+
 ejecutar_retos_de() {
     local num=$1 nombre todos=1
     nombre=$(printf 'RETOS_%02d' "$num")
@@ -957,6 +972,37 @@ ejecutar_retos_de() {
     done
     unset -n retos
     (( todos ))
+}
+
+# Modo repaso: se ve la teoría, pero no se ejecutan los retos ni se
+# marca el nivel como superado (no hay XP ni desbloqueos).
+omitir_retos() {
+    local num=$1
+    pantalla "Nivel ${num} · modo repaso" "Retos omitidos.
+
+Este nivel no se marca como superado ni suma XP.
+La teoría queda vista; puedes seguir con el siguiente nivel." "Enter para continuar"
+    pausa
+}
+
+# Cierra una lección: en modo normal exige los retos; en modo repaso los omite.
+cerrar_leccion() {
+    local num=$1
+
+    if (( MODO_REPASO )); then
+        omitir_retos "$num"
+        return 0
+    fi
+
+    if ejecutar_retos_de "$num"; then
+        finalizar_leccion "$num"
+        return 0
+    fi
+
+    pantalla "Nivel ${num}" "Aún quedan retos pendientes.
+Los tienes guardados en el repaso adaptativo." "Enter para volver"
+    pausa
+    return 1
 }
 
 finalizar_leccion() {
@@ -1430,16 +1476,7 @@ PASOS_00=(
 
 leccion_00() {
     recorrer_pasos PASOS_00 || return 1
-
-    if ejecutar_retos_de 0; then
-        finalizar_leccion 0
-        return 0
-    fi
-
-    pantalla "Nivel 0" "Aún quedan retos pendientes.
-Los tienes guardados en el repaso adaptativo." "Enter para volver"
-    pausa
-    return 1
+    cerrar_leccion 0
 }
 
 # ------------------------------------------------------------ nivel 1 --------
@@ -1761,16 +1798,7 @@ PASOS_01=(
 
 leccion_01() {
     recorrer_pasos PASOS_01 || return 1
-
-    if ejecutar_retos_de 1; then
-        finalizar_leccion 1
-        return 0
-    fi
-
-    pantalla "Nivel 1" "Aún quedan retos pendientes.
-Los tienes guardados en el repaso adaptativo." "Enter para volver"
-    pausa
-    return 1
+    cerrar_leccion 1
 }
 
 # ------------------------------------------------------------ nivel 2 --------
@@ -2464,16 +2492,7 @@ PASOS_02=(
 
 leccion_02() {
     recorrer_pasos PASOS_02 || return 1
-
-    if ejecutar_retos_de 2; then
-        finalizar_leccion 2
-        return 0
-    fi
-
-    pantalla "Nivel 2" "Aún quedan retos pendientes.
-Los tienes guardados en el repaso adaptativo." "Enter para volver"
-    pausa
-    return 1
+    cerrar_leccion 2
 }
 
 # ------------------------------------------------------------ nivel 3 --------
@@ -2966,16 +2985,7 @@ PASOS_03=(
 
 leccion_03() {
     recorrer_pasos PASOS_03 || return 1
-
-    if ejecutar_retos_de 3; then
-        finalizar_leccion 3
-        return 0
-    fi
-
-    pantalla "Nivel 3" "Aún quedan retos pendientes.
-Los tienes guardados en el repaso adaptativo." "Enter para volver"
-    pausa
-    return 1
+    cerrar_leccion 3
 }
 
 # ------------------------------------------------------------ nivel 4 --------
@@ -3598,16 +3608,7 @@ PASOS_04=(
 
 leccion_04() {
     recorrer_pasos PASOS_04 || return 1
-
-    if ejecutar_retos_de 4; then
-        finalizar_leccion 4
-        return 0
-    fi
-
-    pantalla "Nivel 4" "Aún quedan retos pendientes.
-Los tienes guardados en el repaso adaptativo." "Enter para volver"
-    pausa
-    return 1
+    cerrar_leccion 4
 }
 
 # =================================================================== repaso ===
@@ -3698,12 +3699,21 @@ lista_chuletas() {
 
 modo_lineal() {
     local num
-    while true; do
+    if (( MODO_REPASO )); then
+        num=$(siguiente_implementado 0) || num=""
+    else
         num=$(siguiente_leccion)
+    fi
 
+    while true; do
         if [[ -z $num ]]; then
-            pantalla "Todo hecho" "No quedan niveles disponibles en esta versión.
+            if (( MODO_REPASO )); then
+                pantalla "Repaso terminado" "Has visto la teoría de todos los niveles disponibles.
+Tu progreso no ha cambiado." "Enter para salir"
+            else
+                pantalla "Todo hecho" "No quedan niveles disponibles en esta versión.
 El siguiente hito es el menú: se desbloquea al superar el nivel 4." "Enter para salir"
+            fi
             pausa
             return 0
         fi
@@ -3714,10 +3724,16 @@ El siguiente hito es el menú: se desbloquea al superar el nivel 4." "Enter para
             return 0
         fi
 
+        if (( MODO_REPASO )); then
+            num=$(siguiente_implementado $((num + 1))) || num=""
+            continue
+        fi
+
         if tiene_cap menu; then
             menu_principal
             return 0
         fi
+        num=$(siguiente_leccion)
     done
 }
 
@@ -3730,7 +3746,7 @@ jugar_leccion_directa() {
     while true; do
         ejecutar_leccion "$num" || return $?
 
-        if (( num == 4 )) && tiene_cap menu; then
+        if (( num == 4 )) && (( ! MODO_REPASO )) && tiene_cap menu; then
             menu_principal
             return 0
         fi
@@ -3738,7 +3754,14 @@ jugar_leccion_directa() {
         (( num >= 12 )) && return 0
         siguiente=$((num + 1))
         fn=$(funcion_leccion "$siguiente")
-        declare -F "$fn" >/dev/null 2>&1 || return 0
+        if ! declare -F "$fn" >/dev/null 2>&1; then
+            if (( MODO_REPASO )); then
+                pantalla "Repaso terminado" "Has visto la teoría de todos los niveles disponibles.
+Tu progreso no ha cambiado." "Enter para salir"
+                pausa
+            fi
+            return 0
+        fi
 
         pantalla "Siguiente nivel" "Nivel ${siguiente} · ${TITULOS[$siguiente]}" "Enter para continuar · n para salir"
         while true; do
@@ -4352,6 +4375,7 @@ Uso:
   bash bash4u.sh                 empezar o continuar
   bash bash4u.sh --lista         estado de los niveles
   bash bash4u.sh --leccion N     empezar en un nivel concreto
+  bash bash4u.sh --repaso        ver la teoría y omitir los retos
   bash bash4u.sh --solucion N    ver las soluciones de un nivel
   bash bash4u.sh --self-test     verificar el propio curso
   bash bash4u.sh --stage N       previsualizar una etapa (0-5)
@@ -4408,6 +4432,8 @@ main() {
                 MODO_PLANO=1; shift ;;
             --rapido)
                 MODO_RAPIDO=1; shift ;;
+            --repaso|--saltar-retos)
+                MODO_REPASO=1; shift ;;
             --ayuda|--help|-h)
                 accion=ayuda; shift ;;
             --version)
@@ -4448,7 +4474,9 @@ main() {
     esac
 
     configurar_terminal
-    if tiene_cap menu; then
+    if (( MODO_REPASO )); then
+        modo_lineal
+    elif tiene_cap menu; then
         menu_principal
     else
         modo_lineal
