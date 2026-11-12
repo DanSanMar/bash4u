@@ -1060,33 +1060,26 @@ printf "%s\n" "${progreso[@]}"'
 # ------------------------------------------------------------ nivel 0 --------
 
 demo_00_comillas() {
-    printf '%s\n' "→ Comillas dobles: agrupan el texto y conservan los espacios."
     printf '%s\n' '  echo "Hola,   mundo"'
     echo "Hola,   mundo"
 
-    printf '%s\n' "→ Comillas simples: también conservan los espacios."
     printf '%s\n' "  echo 'Hola,   mundo'"
     echo 'Hola,   mundo'
 
-    printf '%s\n' "→ Sin comillas: bash separa por espacios y solo queda uno."
     printf '%s\n' "  echo Hola,   mundo"
     echo Hola,   mundo
 
-    printf '%s\n' "→ Las dobles expanden \$HOME; las simples lo dejan literal."
     printf '%s\n' '  echo "Vivo en $HOME"'
     echo "Vivo en $HOME"
     printf '%s\n' "  echo 'Vivo en \$HOME'"
     echo 'Vivo en $HOME'
 
-    printf '%s\n' '→ La barra invertida permite imprimir una comilla doble:'
     printf '%s\n' '  echo "Él dijo \"hola\""'
     echo "Él dijo \"hola\""
 
-    printf '%s\n' '→ Y un dólar literal dentro de comillas dobles:'
     printf '%s\n' '  echo "Cuesta \$5"'
     echo "Cuesta \$5"
 
-    printf '%s\n' "→ Las comillas no se imprimen: solo agrupan el texto."
     printf '%s\n' "  echo '\"Hola\"'"
     echo '"Hola"'
 }
@@ -1317,8 +1310,6 @@ Por eso:
   - un script se llama .sh
   - una nota o un dato de texto se llama .txt
 
-Crear texto en pantalla:
-  echo "Hola"             imprime Hola y un salto de línea
 TEXTO
 )"
 }
@@ -1326,6 +1317,9 @@ TEXTO
 paso_00_comillas() {
     pantalla "Nivel 0 · Parte 3" "Comillas y argumentos" ""
     paginar "$(cat <<'TEXTO'
+Crear texto en pantalla:
+  echo "Hola"             imprime Hola y un salto de línea
+
 Las comillas agrupan el texto en un solo argumento y no se imprimen.
 Sin comillas, bash parte la línea por los espacios:
 
@@ -1333,8 +1327,7 @@ Sin comillas, bash parte la línea por los espacios:
   echo "Hola,   mundo"   → Hola,   mundo
   echo 'Hola,   mundo'   → Hola,   mundo
 
-No es echo quien borra los espacios: bash ya los usó como separadores
-antes de ejecutarlo. Con comillas, el texto llega entero.
+Con comillas, el texto llega entero.
 TEXTO
 )"
 }
@@ -1367,8 +1360,7 @@ Las comillas tampoco forman parte de la salida:
   echo "Hola"     → Hola
   echo '"Hola"'   → "Hola"
 
-Regla práctica: si el texto lleva espacios, ponlo entre comillas.
-Usa comillas rectas ' y ", no las curvas “ ”.
+Regla práctica: usa siempre comillas.
 TEXTO
 )"
 }
@@ -1383,7 +1375,7 @@ paso_00_redirigir() {
     pantalla "Nivel 0 · Parte 4" "Redirigir la salida a un archivo" ""
     paginar "$(cat <<'TEXTO'
 La salida normal de un comando se llama stdout y va a la pantalla.
-Puedes redirigirla a un archivo con >:
+Puedes redirigirla a un archivo usando este símbolo >
 
   echo "Hola" > saludo.txt
 
@@ -1405,8 +1397,12 @@ También puedes crear carpetas:
   mkdir practica
   mkdir -p ruta/que/no/existe
 
-> escribe; >> añade. El archivo se crea en el directorio actual
-salvo que indiques una ruta:
+Uno > escribe o sobre escribe 
+Dos >> añade al final
+
+En ambos casos, si el archivo no existe 
+se crea en el directorio actual,
+salvo que indiques una ruta en concreto:
   echo "Hola" > practica/saludo.txt
 TEXTO
 )"
