@@ -1439,8 +1439,10 @@ Formas de ejecutar:
 
 Comprobar la sintaxis sin ejecutar:
   bash -n hola.sh
+Si no devuelve error, el codigo no tiene errores de sintaxis.
 
-Un script no es magia: es texto. Puedes verlo con cat y editarlo.
+Un script no es magia: es texto. 
+Puedes verlo con cat/bat y editarlo con un editor (nano, micro...).
 TEXTO
 )"
 }
@@ -1638,7 +1640,7 @@ paso_01_variables() {
 Una variable guarda un valor con un nombre. Se asigna así:
   nombre=Ada
 
-No pongas espacios alrededor del =:
+No pongas espacios alrededor del =
   nombre = Ada    ← error
 
 Para usar el valor, pon $ delante:
@@ -1651,11 +1653,15 @@ TEXTO
 paso_01_variables_comillas() {
     pantalla "Nivel 1 · Parte 1" "Variables: comillas y llaves" ""
     paginar "$(cat <<'TEXTO'
-Las comillas dobles expanden la variable; las simples la dejan literal.
-Si el valor lleva espacios, ponlo entre comillas al asignarlo:
+Las comillas dobles expanden la variable,
+las simples la dejan literal.
+Si el valor lleva espacios, 
+ponlo entre comillas al asignarlo:
+
   frase="hola mundo"
 
 Las llaves separan el nombre del texto que va detrás:
+ 
   echo "${nombre}ismo"     → Adaismo
 TEXTO
 )"
